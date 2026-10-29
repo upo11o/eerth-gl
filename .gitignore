@@ -1,5 +1,6 @@
 https
 node_modules
+.npmrc
 .idea
 .DS_Store
 bun.lock
