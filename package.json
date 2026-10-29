@@ -1,0 +1,21 @@
+{
+  "name": "eerth-gl",
+  "module": "lib/index.ts",
+  "type": "module",
+  "keywords": [ "webgl", "graphics", "utilities" ],
+  "sideEffects": false,
+  "scripts": {
+    "dev": "bun server.ts",
+    "tsc": "tsc -p tsconfig.json",
+    "get-https": "mkdir https && openssl req -x509 -newkey rsa:4096 -keyout https/key -out https/cert -days 9999 -nodes -subj /CN=localhost"
+  },
+  "devDependencies": {
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "@types/bun": "^1.4.4",
+    "@types/webxr": "^0.5.24",
+    "@typescript-eslint/parser": "^8.72.1",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.13.0",
+    "typescript": "^6.0.3"
+  }
+}

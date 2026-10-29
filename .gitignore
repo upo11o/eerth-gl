@@ -1,0 +1,7 @@
+https
+node_modules
+.idea
+.DS_Store
+bun.lock
+public/*.js
+public/*.map
