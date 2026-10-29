@@ -1,9 +1,12 @@
 {
   "name": "eerth-gl",
+  "version": "0.0.0",
+  "description": "A tiny, dependency-free, and all-tree-shakeable TS wrapper over WebGL2 and essential graphics utilities. Keep zero overhead and full controll.",
+  "keywords": [ "webgl", "graphics", "library", "tool", "utily" ],
   "module": "lib/index.ts",
   "type": "module",
-  "keywords": [ "webgl", "graphics", "utilities" ],
   "sideEffects": false,
+  "files": [ "./lib" ],
   "scripts": {
     "dev": "bun server.ts",
     "tsc": "tsc -p tsconfig.json",
