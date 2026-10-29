@@ -7,6 +7,14 @@
   "type": "module",
   "sideEffects": false,
   "files": [ "./lib" ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/upo11o/eerth-gl.git"
+  },
+  "bugs": {
+    "url": "https://github.com/upo11o/eerth-gl/issues"
+  },
+  "homepage": "https://github.com/upo11o/eerth-gl#readme",
   "scripts": {
     "dev": "bun server.ts",
     "tsc": "tsc -p tsconfig.json",
