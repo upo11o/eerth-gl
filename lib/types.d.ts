@@ -1,10 +1,3 @@
-declare const canvas: HTMLCanvasElement
-
-declare module "*.glsl" {
-  const content: string
-  export default content
-}
-
 type Prettify<T> = { [K in keyof T]: T[K]} & {}
 
 type Tuple<T, N extends number, R extends T[] = []> = R["length"] extends N ? R : Tuple<T, N, [ T, ...R ]>
