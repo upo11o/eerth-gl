@@ -71,6 +71,7 @@ export const ceil_to_odd  = (n: number) => ceil(n) | 1
 export const mod = (n: number, m: number) => ((n % m) + m) % m
 export const mod_range = (n: number, min_value: number, max_value: number) => min_value + mod(n - min_value, max_value - min_value)
 
+export const smooth_1 = (t: number) => t * t * (3 - 2 * t)
 export const smooth_2 = (t: number) => t * t * t * (t * (6 * t - 15) + 10)
 export const smooth_3 = (t: number) => t * t * t * t * (35 - t * (84 - t * (70 - t * 20)))
 
@@ -80,6 +81,7 @@ export const ease_quadratic_bezier = (t: number, control: number) => {
 export const ease_cubic_bezier = (t: number, control: number) => {
   return 3 * t * (1 - t) * control + t * t * t
 }
+
 
 const factorial_cache = [ 1, 1 ]
 
