@@ -1,5 +1,4 @@
-import { abs, bind_ubo, bind_vertex_data, clamp, cube_lines, distance2, get_sphere_lines, IOTA, mat4_rot_gx, mat4_rot_ly, mat4_scl, mat4_set_orthographic_projection, min, new_mat4, new_material, new_shader, new_ubo, rnd, SQRT1_3, update_ubo } from "../lib"
-import { draw_axis, new_axis } from "../lib/axis"
+import { bind_ubo, bind_vertex_data, clamp, cprints, cube_lines, draw_axis, get_sphere_lines, init_printer, IOTA, mat4_rot_gx, mat4_rot_ly, mat4_scl, mat4_set_orthographic_projection, new_axis, new_mat4, new_material, new_shader, new_ubo, new_worker, prints, SQRT1_3, update_ubo } from "../lib"
 
 
 declare const canvas: HTMLCanvasElement
@@ -77,34 +76,41 @@ bind_ubo(gl, ubo, pack.id)
 //////// PACK GEOMETRY
 ///////
 
+init_printer(null, "margin: 8px")
+
 const pack_vao = gl.createVertexArray()
 gl.bindVertexArray(pack_vao)
 
 const sphere_shape = get_sphere_lines(10, 6, 1)
-
-const spheres_transform: number[] = []
-
-{
-  const MIN_R = 0.01
-  const MAX_R = 0.33
-  let i = 0, count = 0
-  while (i++ < 10_000) {
-    const x = rnd(-1, 1)
-    const y = rnd(-1, 1)
-    const z = rnd(-1, 1)
-    const r = test_radius(x, y, z, count, MIN_R, MAX_R)
-    if (r) {
-      spheres_transform.push(x, y, z, r)
-      count++
-    }
-  }
-}
-
-bind_vertex_data(gl, sphere_shape, [ pack.attributes.apos ])
-bind_vertex_data(gl, new Float32Array(spheres_transform), [ pack.attributes.ipos, pack.attributes.iradius ], 1)
-
 const pack_vertices = sphere_shape.length / 3
-const pack_instances = spheres_transform.length >> 2
+bind_vertex_data(gl, sphere_shape, [ pack.attributes.apos ])
+
+const MAX_TRIES = 1000_000
+const MAX_COUNT = 2000
+const MIN_R = 0.01
+const MAX_R = 0.33
+
+let pack_instances = 0
+const ibind = bind_vertex_data(gl, MAX_COUNT << 4, [ pack.attributes.ipos, pack.attributes.iradius ], 1)
+
+const pack_start_time = performance.now()
+let worker = new_worker(`(${worker_self})(${MAX_TRIES},${MAX_COUNT},${MIN_R},${MAX_R})`)
+const instance_data = new Float32Array(4)
+
+worker.onmessage = e => {
+  if (e.data.done) {
+    const pack_time = (performance.now() - pack_start_time) * 0.001
+    prints("\ndone in", `${pack_time.toFixed(3)}s`)
+    worker.terminate()
+    worker = null!
+    return
+  }
+  instance_data.set(e.data)
+  gl.bindBuffer(gl.ARRAY_BUFFER, ibind.vbo)
+  gl.bufferSubData(gl.ARRAY_BUFFER, pack_instances++ << 4, instance_data)
+  request_draw()
+  cprints(pack_instances, "spheres")
+}
 
 
 //////// CUBE
@@ -200,7 +206,7 @@ onpointermove = (e) => {
 }
 
 
-//////// HELPERS
+//////// RESIZE HANDLER
 ///////
 
 const resize = () => {
@@ -219,38 +225,66 @@ resize()
 addEventListener("resize", resize)
 
 
-function test_radius(x: number, y: number, z: number, n: number, min_r: number, max_r: number) {
-  let r = min(1 - abs(x), 1 - abs(y), 1 - abs(z))
+//////// WORKER
+///////
 
-  if (r <= min_r) {
-    return 0
+function worker_self(
+  MAX_TRIES: number,
+  MAX_COUNT: number,
+  MIN_R: number,
+  MAX_R: number,
+) {
+  const store: number[] = []
+  let i = 0, count = 0
+
+  while (i++ < MAX_TRIES && count < MAX_COUNT) {
+    const x = Math.random() * 2 - 1
+    const y = Math.random() * 2 - 1
+    const z = Math.random() * 2 - 1
+    const r = test_radius(x, y, z, count, MIN_R, MAX_R)
+    if (r) {
+      store.push(x, y, z, r)
+      count++
+      postMessage([x, y, z, r])
+    }
   }
 
-  if (n === 0) {
-    return min(r, max_r)
-  }
+  postMessage({ done: true })
 
-  n <<= 2
-  for (let i = 0; i < n; i += 4) {
-    const xo = spheres_transform[i + 0]
-    const yo = spheres_transform[i + 1]
-    const zo = spheres_transform[i + 2]
-    const ro = spheres_transform[i + 3]
+  function test_radius(x: number, y: number, z: number, n: number, min_r: number, max_r: number) {
+    let r = Math.min(1 - Math.abs(x), 1 - Math.abs(y), 1 - Math.abs(z))
 
-    // test x-axiz, yz
-    const yz = distance2(y, z, yo, zo)
-    // test y-axis, xz
-    const xz = distance2(x, z, xo, zo)
-    // test z-axis, xy
-    const xy = distance2(x, y, xo, yo)
-
-    if (yz <= (ro + min_r) || xz <= (ro + min_r) || xy <= (ro + min_r)) {
-      r = 0
-      break
+    if (r <= min_r) {
+      return 0
     }
 
-    r = min(r, yz - ro, xz - ro, xy - ro)
-  }
+    if (n === 0) {
+      return Math.min(r, max_r)
+    }
 
-  return min(r, max_r)
+    n <<= 2
+    for (let i = 0; i < n; i += 4) {
+      const xo = store[i + 0]
+      const yo = store[i + 1]
+      const zo = store[i + 2]
+      const ro = store[i + 3]
+
+      // test x-axiz, yz
+      const yz = Math.hypot(y - yo, z - zo)
+      // test y-axis, xz
+      const xz = Math.hypot(x - xo, z - zo)
+      // test z-axis, xy
+      const xy = Math.hypot(x - xo, y - yo)
+
+      if (yz <= (ro + min_r) || xz <= (ro + min_r) || xy <= (ro + min_r)) {
+        r = 0
+        break
+      }
+
+      r = Math.min(r, yz - ro, xz - ro, xy - ro)
+    }
+
+    return Math.min(r, max_r)
+  }
 }
+
