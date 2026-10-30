@@ -1,12 +1,25 @@
 {
   "name": "eerth-gl",
   "version": "0.0.0",
-  "description": "A tiny, dependency-free, and all-tree-shakeable TS wrapper over WebGL2 and essential graphics utilities. Keep zero overhead and full controll.",
-  "keywords": [ "webgl", "graphics", "library", "tool", "utily" ],
-  "module": "lib/index.ts",
+  "description": "A tiny, dependency-free, and all-tree-shakeable TS wrapper over WebGL2 including essential graphics utilities. Keep zero overhead and full controll.",
+  "keywords": [
+    "webgl",
+    "graphics",
+    "library",
+    "tool",
+    "utily"
+  ],
+  "author": {
+    "name": "Sergey Borovikov",
+    "email": "serg.there@gmail.com",
+    "url": "https://upo11o.github.io"
+  },
+  "license": "MIT",
+  "module": "./lib/index.ts",
   "type": "module",
-  "sideEffects": false,
-  "files": [ "./lib" ],
+  "files": [
+    "./lib"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/upo11o/eerth-gl.git"
