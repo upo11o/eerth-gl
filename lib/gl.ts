@@ -311,7 +311,7 @@ const new_binded_pointer = (p: Attribute_Pointer): Binded_Attribute_Pointer => (
 
 export const bind_vertex_data = (
   gl:       WebGL2RenderingContext,
-  data:     ArrayBuffer | TypedArray,
+  data:     ArrayBuffer | TypedArray | number,
   pointers: Attribute_Pointer[],
   divisor = 0,
   usage: Usage = GL.STATIC_DRAW,
@@ -335,7 +335,7 @@ export const bind_vertex_data = (
   if (binded_pointers.length) {
     vbo = gl.createBuffer()!
     gl.bindBuffer(gl.ARRAY_BUFFER, vbo)
-    gl.bufferData(gl.ARRAY_BUFFER, data, usage)
+    gl.bufferData(gl.ARRAY_BUFFER, data as AllowSharedBufferSource, usage)
   }
 
   for (const pointer of binded_pointers) {
@@ -365,7 +365,9 @@ export const bind_vertex_data = (
     gl.enableVertexAttribArray(id)
   }
 
-  const count = stride ? data.byteLength / stride : 0
+  const data_is_length = typeof data === "number"
+
+  const count = stride ? (data_is_length ? data : data.byteLength) / stride : 0
   if (count === 0) {
     console.warn("no pointers provided, VBO wasn't initialized")
   }
@@ -373,7 +375,7 @@ export const bind_vertex_data = (
     console.warn("data byte length is not aligned with pointers stride")
   }
 
-  return { data, vbo, pointers: binded_pointers, count, stride, usage }
+  return { data: (data_is_length ? null! : data), vbo, pointers: binded_pointers, count, stride, usage }
 }
 
 
