@@ -1,3 +1,6 @@
+type Nullish = null | undefined
+type Primitive = string | number | boolean
+
 type Prettify<T> = { [K in keyof T]: T[K]} & {}
 
 type Tuple<T, N extends number, R extends T[] = []> = R["length"] extends N ? R : Tuple<T, N, [ T, ...R ]>
