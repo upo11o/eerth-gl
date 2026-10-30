@@ -8,6 +8,79 @@ export const cube_lines = new Float32Array([
 ])
 
 
+export const get_ring_lines = (
+  segments: number,
+  radius: number,
+) => {
+  segments = max(3, segments)
+  const ia = TAU / segments
+  const buf: number[] = []
+  let px = radius, py = 0
+
+  for (let i = 1; i <= segments; i++) {
+    const a = i * ia
+    const x = cos(a) * radius
+    const y = sin(a) * radius
+    buf.push(px, py, x, y)
+    px = x
+    py = y
+  }
+
+  return new Float32Array(buf)
+}
+
+
+export const get_cone_y_lines = (
+  segments: number,
+  height: number,
+  radius: number,
+  azimut_offset = 0,
+) => {
+  segments = max(3, segments)
+  const ia = TAU / segments
+  const buf: number[] = []
+  let pa = azimut_offset, px = cos(pa) * radius, pz = sin(pa) * radius
+
+  for (let i = 1; i <= segments; i++) {
+    pa += ia
+    const x = cos(pa) * radius
+    const z = sin(pa) * radius
+    buf.push(px, 0, pz, x, 0, z, px, 0, pz, 0, height, 0)
+    px = x
+    pz = z
+  }
+
+  return new Float32Array(buf)
+}
+
+
+export const get_cone_y = (
+  segments: number,
+  height: number,
+  radius: number,
+  azimut_offset = 0,
+) => {
+  segments = max(3, segments)
+  const ia = TAU / segments
+  const buf: number[] = []
+  let pa = azimut_offset, px = cos(pa) * radius, pz = sin(pa) * radius
+
+  for (let i = 1; i <= segments; i++) {
+    pa += ia
+    const x = cos(pa) * radius
+    const z = sin(pa) * radius
+    buf.push(
+      x, 0, z, 0, height, 0, px, 0, pz,
+      px, 0, pz, 0, 0, 0, x, 0, z,
+    )
+    px = x
+    pz = z
+  }
+
+  return new Float32Array(buf)
+}
+
+
 export const get_sphere_lines = (
   width_segments: number,
   height_segments: number,
