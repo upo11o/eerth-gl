@@ -49,7 +49,7 @@ export const new_axis = (
   const axis = new_material(gl, input + axis_vert + output + ";}", axis_frag)!
   const vao = gl.createVertexArray()
   gl.bindVertexArray(vao)
-  const bind = bind_vertex_data(gl, new Float32Array(attr), [ axis.attributes.p, axis.attributes.c ])
+  bind_vertex_data(gl, new Float32Array(attr), [ axis.attributes.g, axis.attributes.c ])
 
   return Object.assign(axis, { vao })
 }
