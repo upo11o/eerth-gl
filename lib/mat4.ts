@@ -1,4 +1,4 @@
-import { abs, cos, sin, sqrt, tan } from "./math"
+import { abs, cos, DEG2RAD, sin, sqrt, tan } from "./math"
 
 
 const id_mat4 = new Float32Array([
@@ -367,7 +367,7 @@ export const mat4_set_perspective_projection = (
 ): void => {
   m.fill(0)
   const sign = left_hand ? 1 : -1
-  const f = 1 / tan(fov / 2)
+  const f = 1 / tan(fov * DEG2RAD / 2)
   const inv_range = 1 / (far - near)
   m[0]  = f / aspect
   m[5]  = f
