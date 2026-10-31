@@ -48,6 +48,17 @@ export const vec4_copy = (v: NumberArray, t: NumberArray): void => {
 }
 
 
+export const vec2_clone = (v: NumberArray): Float32Array => {
+  const t = new_vec2(); vec2_copy(v, t); return t
+}
+export const vec3_clone = (v: NumberArray): Float32Array => {
+  const t = new_vec3(); vec3_copy(v, t); return t
+}
+export const vec4_clone = (v: NumberArray): Float32Array => {
+  const t = new_vec4(); vec4_copy(v, t); return t
+}
+
+
 export const vec2_add = (a: NumberArray, b: NumberArray, t = a): void => {
   t[0] = a[0] + b[0]; t[1] = a[1] + b[1]
 }
@@ -90,6 +101,15 @@ export const vec3_dot = (a: NumberArray, b: NumberArray): number => (
 export const vec4_dot = (a: NumberArray, b: NumberArray): number => (
   a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
 )
+
+
+/** Linearly interpolates between target (alpha = 0) and vector (alpha = 1)*/
+export const vec3_lerp = (t: NumberArray, v: NumberArray, alpha: number): void => {
+  t[0] += (v[0] - t[0]) * alpha
+  t[1] += (v[1] - t[1]) * alpha
+  t[2] += (v[2] - t[2]) * alpha
+}
+
 
 /** reflects `v` off a surface with unit normal `n` */
 export const vec2_reflect = (v: NumberArray, n: NumberArray, t = v): void => {
