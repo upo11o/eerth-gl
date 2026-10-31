@@ -1,22 +1,14 @@
-import { IOTA } from "./math"
-import { get_cone_y } from "./geometry"
+import { get_cone_y, get_tube_y } from "./geometry"
 import { bind_vertex_data, type Material, new_material } from "./gl"
 
 
-const origin = [ 0, 0, 0, 1 ]
+const xc = [ 0.9, 0.35, 0, 1 ]
+const yc = [ 0.3, 0.7, 0.1, 1 ]
+const zc = [ 0, 0.6, 1, 1 ]
 
-const xc = [ 1, 0.3, 0, 1 ]
-const yc = [ 0, 0.8, 0, 1 ]
-const zc = [ 0, 0.7, 1, 1 ]
-
-const geometry = [
-  ...origin, ...xc,  0.9, 0, 0, 1, ...xc,
-  ...origin, ...yc,  0, 0.9, 0, 1, ...yc,
-  ...origin, ...zc,  0, 0, 0.9, 1, ...zc,
-]
-
+const tube_segments = 8
 const cone_segments = 12
-const cones_vertices = cone_segments * 18
+const axis_vertices = (tube_segments + cone_segments) * 6 * 3
 
 const axis_vert = /*glsl*/"\n#define p gl_Position\nin vec4 g;in vec4 c;out vec4 v;void main(){v=c;p=g;"
 const axis_frag = /*glsl*/"precision highp float;in vec4 v;out vec4 o;void main(){o=v;}"
@@ -32,14 +24,22 @@ export const new_axis = (
   input = "",
   output = "",
 ): Material & { vao: WebGLVertexArrayObject } => {
-  const cone = get_cone_y(cone_segments, 0.1, 0.04, IOTA * 0.5)
-  // x cone
+  const tube = get_tube_y(0.005, 0.9, tube_segments)
+  const cone = get_cone_y(0.04, 0.1, cone_segments)
+  const geometry: number[] = []
+  // x
+  for (let i = 0; i < tube.length; i += 3)
+    geometry.push(0.45 + tube[i + 1], -tube[i], tube[i + 2], 1, ...xc)
   for (let i = 0; i < cone.length; i += 3)
     geometry.push(0.9 + cone[i + 1], -cone[i], cone[i + 2], 1, ...xc)
-  // y cone
+  // y
+  for (let i = 0; i < tube.length; i += 3)
+    geometry.push(tube[i], 0.45 + tube[i + 1], tube[i + 2], 1, ...yc)
   for (let i = 0; i < cone.length; i += 3)
     geometry.push(cone[i], 0.9 + cone[i + 1], cone[i + 2], 1, ...yc)
-  // z cone
+  // z
+  for (let i = 0; i < tube.length; i += 3)
+    geometry.push(tube[i], -tube[i + 2], 0.45 + tube[i + 1], 1, ...zc)
   for (let i = 0; i < cone.length; i += 3)
     geometry.push(cone[i], -cone[i + 2], 0.9 + cone[i + 1], 1, ...zc)
 
@@ -53,6 +53,5 @@ export const new_axis = (
 
 
 export const draw_axis = (gl: WebGL2RenderingContext) => {
-  gl.drawArrays(1, 0, 6)
-  gl.drawArrays(4, 6, cones_vertices)
+  gl.drawArrays(4, 0, axis_vertices)
 }

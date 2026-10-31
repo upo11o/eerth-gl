@@ -1,4 +1,4 @@
-import { bind_ubo, bind_vertex_data, clamp, cprints, cube_lines, draw_axis, get_sphere_lines, init_printer, IOTA, mat4_rot_gx, mat4_rot_ly, mat4_scl, mat4_set_orthographic_projection, new_axis, new_mat4, new_material, new_shader, new_ubo, new_worker, prints, SQRT1_3, update_ubo } from "../lib"
+import { bind_ubo, bind_vertex_data, clamp, cprints, cube_lines, draw_axis, get_icosahedron, init_printer, IOTA, mat4_rot_gx, mat4_rot_ly, mat4_scl, mat4_set_orthographic_projection, new_axis, new_mat4, new_material, new_shader, new_ubo, new_worker, prints, SQRT1_3, tris_to_lines, update_ubo } from "../lib"
 
 
 declare const canvas: HTMLCanvasElement
@@ -46,7 +46,8 @@ in float z;
 out vec3 Color;
 float lift(float v, float t) { return v * (1.0 - t) + t; }
 void main() {
-  Color = vec3(lift(z, 0.1));
+  float d = z * z;
+  Color = vec3(lift(d * (2.0 - d), 0.1));
 }`)!
 
 const define_var_z = /*glsl*/"out float z;"
@@ -81,21 +82,22 @@ init_printer(null, "margin: 8px")
 const pack_vao = gl.createVertexArray()
 gl.bindVertexArray(pack_vao)
 
-const sphere_shape = get_sphere_lines(10, 6, 1)
-const pack_vertices = sphere_shape.length / 3
-bind_vertex_data(gl, sphere_shape, [ pack.attributes.apos ])
+const icosa = get_icosahedron(1, 1)
+const sphere_lines = tris_to_lines(icosa, 3)
+bind_vertex_data(gl, sphere_lines, [ pack.attributes.apos ])
+const sphere_vertices = sphere_lines.length / 3
 
 const MAX_TRIES = 1000_000
 const MAX_COUNT = 2000
 const MIN_R = 0.01
 const MAX_R = 0.33
 
-let pack_instances = 0
-const ibind = bind_vertex_data(gl, MAX_COUNT << 4, [ pack.attributes.ipos, pack.attributes.iradius ], 1)
+let sphere_instances = 0
+const ivbo = bind_vertex_data(gl, MAX_COUNT << 4, [ pack.attributes.ipos, pack.attributes.iradius ], 1).vbo
 
 const pack_start_time = performance.now()
 let worker = new_worker(`(${worker_self})(${MAX_TRIES},${MAX_COUNT},${MIN_R},${MAX_R})`)
-const instance_data = new Float32Array(4)
+const instance_dummy = new Float32Array(4)
 
 worker.onmessage = e => {
   if (e.data.done) {
@@ -105,11 +107,11 @@ worker.onmessage = e => {
     worker = null!
     return
   }
-  instance_data.set(e.data)
-  gl.bindBuffer(gl.ARRAY_BUFFER, ibind.vbo)
-  gl.bufferSubData(gl.ARRAY_BUFFER, pack_instances++ << 4, instance_data)
+  instance_dummy.set(e.data)
+  gl.bindBuffer(gl.ARRAY_BUFFER, ivbo)
+  gl.bufferSubData(gl.ARRAY_BUFFER, sphere_instances++ << 4, instance_dummy)
   request_draw()
-  cprints(pack_instances, "spheres")
+  cprints(sphere_instances, "spheres")
 }
 
 
@@ -154,7 +156,7 @@ const draw = () => {
 
   gl.useProgram(pack.id)
   gl.bindVertexArray(pack_vao)
-  gl.drawArraysInstanced(gl.LINES, 0, pack_vertices, pack_instances)
+  gl.drawArraysInstanced(gl.LINES, 0, sphere_vertices, sphere_instances)
 
   gl.useProgram(cube.id)
   gl.bindVertexArray(cube_vao)
@@ -162,6 +164,7 @@ const draw = () => {
 
   gl.useProgram(axis.id)
   gl.bindVertexArray(axis.vao)
+  gl.clear(gl.DEPTH_BUFFER_BIT)
   draw_axis(gl)
 
   drawing = false
@@ -235,34 +238,34 @@ function worker_self(
   MAX_R: number,
 ) {
   const store: number[] = []
-  let i = 0, count = 0
+  let tries = 0, count = 0
 
-  while (i++ < MAX_TRIES && count < MAX_COUNT) {
+  while (tries++ < MAX_TRIES && count < MAX_COUNT) {
     const x = Math.random() * 2 - 1
     const y = Math.random() * 2 - 1
     const z = Math.random() * 2 - 1
-    const r = test_radius(x, y, z, count, MIN_R, MAX_R)
+    const r = test_radius(x, y, z)
     if (r) {
-      store.push(x, y, z, r)
       count++
-      postMessage([x, y, z, r])
+      store.push(x, y, z, r)
+      postMessage([ x, y, z, r ])
     }
   }
 
   postMessage({ done: true })
 
-  function test_radius(x: number, y: number, z: number, n: number, min_r: number, max_r: number) {
+  function test_radius(x: number, y: number, z: number) {
     let r = Math.min(1 - Math.abs(x), 1 - Math.abs(y), 1 - Math.abs(z))
 
-    if (r <= min_r) {
+    if (r <= MIN_R) {
       return 0
     }
 
-    if (n === 0) {
-      return Math.min(r, max_r)
+    if (count === 0) {
+      return Math.min(r, MAX_R)
     }
 
-    n <<= 2
+    const n = count << 2
     for (let i = 0; i < n; i += 4) {
       const xo = store[i + 0]
       const yo = store[i + 1]
@@ -276,7 +279,7 @@ function worker_self(
       // test z-axis, xy
       const xy = Math.hypot(x - xo, y - yo)
 
-      if (yz <= (ro + min_r) || xz <= (ro + min_r) || xy <= (ro + min_r)) {
+      if (yz <= (ro + MIN_R) || xz <= (ro + MIN_R) || xy <= (ro + MIN_R)) {
         r = 0
         break
       }
@@ -284,7 +287,7 @@ function worker_self(
       r = Math.min(r, yz - ro, xz - ro, xy - ro)
     }
 
-    return Math.min(r, max_r)
+    return Math.min(r, MAX_R)
   }
 }
 
