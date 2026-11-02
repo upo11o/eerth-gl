@@ -97,6 +97,13 @@ export const factorial = (n: number): number => {
 }
 
 
+export const calc_texture_size = (count: number): { width: number, height: number } => {
+  const width = ceil(sqrt(count))
+  const height = ceil(count / width)
+  return { width, height }
+}
+
+
 /** cosine distributed sample inside hemiball
  * @param {number} u1 random float [0..1], defines polar angle
  * @param {number} u2 random float [0..1], defines azimuthal angle
