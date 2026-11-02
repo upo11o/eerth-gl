@@ -64,7 +64,7 @@ export const new_camera = (
   vec3_set(target, tx, ty, tz)
   camera_update_mat(camera)
   if (camera.type === Camera_Projection_Type.perspective) {
-    camera_set_orthographic_projection(camera)
+    camera_set_perspective_projection(camera)
   } else {
     camera_set_orthographic_projection(camera)
   }
@@ -75,7 +75,7 @@ export const new_camera = (
 
 export const camera_update_mat = (camera: Camera) => {
   const t = camera.target
-  mat4_look_at(camera.mat, t[0], t[1], t[2], true)
+  mat4_look_at(camera.mat, t[0], t[1], t[2], !camera.left_hand)
   mat4_invert(camera.mat, camera.view)
 }
 
