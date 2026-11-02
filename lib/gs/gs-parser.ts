@@ -1,4 +1,4 @@
-import { Ply_Element, Ply_Property } from "./ply-loader"
+import { Ply_Element, Ply_Property } from "../loaders/gs-loader"
 
 declare const postMessage: Worker["postMessage"]
 
