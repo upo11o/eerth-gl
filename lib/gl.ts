@@ -24,8 +24,10 @@ const enum GL {
   UNSIGNED_INT_VEC2 = 36294,
   UNSIGNED_INT_VEC3 = 36295,
   UNSIGNED_INT_VEC4 = 36296,
-  UNSIGNED_BYTE = 5121,
   BYTE = 5120,
+  UNSIGNED_BYTE = 5121,
+  SHORT = 5122,
+  UNSIGNED_SHORT = 5123,
 
   RGBA32F = 34836,
   RGB32F = 34837,
@@ -44,6 +46,10 @@ const enum GL {
 
   R8I = 33329,
   R8UI = 33330,
+  R16I = 33331,
+  R16UI = 33332,
+  R32I = 33333,
+  R32UI = 33334,
 
   RGBA = 6408,
   RGB = 6407,
@@ -473,8 +479,12 @@ export type Texture_Format =
 | GL.RGB8
 | GL.RG8
 | GL.R8
-| GL.R8UI
 | GL.R8I
+| GL.R8UI
+| GL.R16I
+| GL.R16UI
+| GL.R32I
+| GL.R32UI
 
 
 const texture_format_map: Record<Texture_Format, number> = {
@@ -493,8 +503,12 @@ const texture_format_map: Record<Texture_Format, number> = {
   [GL.RG8]:   GL.RG,
   [GL.R8]:    GL.RED,
 
-  [GL.R8UI]: GL.RED_INTEGER,
-  [GL.R8I]:  GL.RED_INTEGER,
+  [GL.R8I]:   GL.RED_INTEGER,
+  [GL.R8UI]:  GL.RED_INTEGER,
+  [GL.R16I]:  GL.RED_INTEGER,
+  [GL.R16UI]: GL.RED_INTEGER,
+  [GL.R32I]:  GL.RED_INTEGER,
+  [GL.R32UI]: GL.RED_INTEGER,
 }
 
 
@@ -514,8 +528,12 @@ const texture_type_map: Record<Texture_Format, number> = {
   [GL.RG8]:   GL.UNSIGNED_BYTE,
   [GL.R8]:    GL.UNSIGNED_BYTE,
 
-  [GL.R8UI]: GL.UNSIGNED_BYTE,
-  [GL.R8I]:  GL.BYTE,
+  [GL.R8I]:   GL.BYTE,
+  [GL.R8UI]:  GL.UNSIGNED_BYTE,
+  [GL.R16I]:  GL.SHORT,
+  [GL.R16UI]: GL.UNSIGNED_SHORT,
+  [GL.R32I]:  GL.INT,
+  [GL.R32UI]: GL.UNSIGNED_INT,
 }
 
 
@@ -620,6 +638,25 @@ export const upload_texture = (
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
   }
   gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, texture.width, texture.height, texture.format, texture.type, data)
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
+}
+
+
+export const subupload_texture = (
+  gl: WebGL2RenderingContext,
+  texture: Texture,
+  xoffset: number,
+  yoffset: number,
+  width: number,
+  height: number,
+  data: TypedArray | TexImageSource,
+  flip_y = false,
+) => {
+  use_texture(gl, texture)
+  if (flip_y) {
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
+  }
+  gl.texSubImage2D(gl.TEXTURE_2D, 0, xoffset, yoffset, width, height, texture.format, texture.type, data)
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
 }
 
