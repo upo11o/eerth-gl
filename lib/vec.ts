@@ -6,7 +6,7 @@ const id_vec2 = new Float32Array([ 0, 0 ])
 export const new_vec2 = (from: NumberArray = id_vec2): Float32Array => new Float32Array(from)
 /** creates Float32Array view */
 export const new_vec2_from_buffer = (buf: ArrayBuffer, byte_offset: number): Float32Array => (
-  new Float32Array(buf, byte_offset, 8)
+  new Float32Array(buf, byte_offset, 2)
 )
 
 const id_vec3 = new Float32Array([ 0, 0, 0 ])
@@ -14,7 +14,7 @@ const id_vec3 = new Float32Array([ 0, 0, 0 ])
 export const new_vec3 = (from: NumberArray = id_vec3): Float32Array => new Float32Array(from)
 /** creates Float32Array view */
 export const new_vec3_from_buffer = (buf: ArrayBuffer, byte_offset: number): Float32Array => (
-  new Float32Array(buf, byte_offset, 12)
+  new Float32Array(buf, byte_offset, 3)
 )
 
 const id_vec4 = new Float32Array([ 0, 0, 0, 0 ])
@@ -22,7 +22,7 @@ const id_vec4 = new Float32Array([ 0, 0, 0, 0 ])
 export const new_vec4 = (from: NumberArray = id_vec4): Float32Array => new Float32Array(from)
 /** creates Float32Array view */
 export const new_vec4_from_buffer = (buf: ArrayBuffer, byte_offset: number): Float32Array => (
-  new Float32Array(buf, byte_offset, 16)
+  new Float32Array(buf, byte_offset, 4)
 )
 
 
