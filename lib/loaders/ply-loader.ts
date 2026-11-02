@@ -3,6 +3,7 @@ import { buf_starts_with, find_in_buf } from "../bits"
 import { new_stream, stream_compact, stream_dispose, stream_get_remaining_length, stream_read_f32, stream_read_u8, stream_upload, type Stream } from "./stream"
 import { parser_worker, Ply_Parser_Input_Data, Ply_Parser_Input_Header, Ply_Parser_Output } from "./ply-parser"
 import { noop } from "../noop"
+import { new_worker } from "../worker"
 
 
 export type Ply_Property = {
@@ -26,7 +27,7 @@ export type Ply_Header = {
 }
 
 
-export const read_ply = async (
+export const load_ply = async (
   url: string,
   on_header: (header: Ply_Header, count: number) => void,
   on_data: (data: Ply_Parser_Output) => void,
@@ -34,12 +35,10 @@ export const read_ply = async (
 ) => {
   let stream: Stream | undefined
   let worker: Worker | undefined
-  let worker_url_obj: string | undefined
 
   const terminate_worker = () => {
     worker?.terminate()
-    URL.revokeObjectURL(worker_url_obj!)
-    worker = worker_url_obj = undefined
+    worker = undefined
   }
 
   try {
@@ -65,11 +64,7 @@ export const read_ply = async (
     on_header(header, vertex_header.count)
 
     //// prepare vertex parser worker
-    worker_url_obj = URL.createObjectURL(new Blob(
-      [ `(${parser_worker})()` ],
-      { type: "text/javascript" },
-    ))
-    worker = new Worker(worker_url_obj)
+    worker = new_worker(`(${parser_worker})()`)
 
     const header_message: Ply_Parser_Input_Header = { type: "header", ...vertex_header }
     worker.postMessage(header_message)
