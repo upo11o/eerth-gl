@@ -3,8 +3,8 @@ import plugin from "@stylistic/eslint-plugin"
 import parser from "@typescript-eslint/parser"
 
 
-export default defineConfig({
-  files:           [ "lib/*.ts", "public/*.ts" ],
+export default [{
+  files:           [ "**/*.ts", "**/*.ts" ],
   languageOptions: {
     ecmaVersion: "latest",
     sourceType:  "module",
@@ -78,4 +78,4 @@ export default defineConfig({
       nonwords: false,
     }],
   },
-})
+}]
