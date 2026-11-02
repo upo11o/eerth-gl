@@ -1,3 +1,8 @@
+declare module "*.glsl" {
+  const content: string
+  export default content
+}
+
 type Nullish = null | undefined
 type Primitive = string | number | boolean
 
@@ -58,3 +63,14 @@ interface WebGL2RenderingContextOverloads {
     source:  TexImageSource | ArrayBufferView<ArrayBufferLike> | null
   ): void
 }
+
+interface ReadonlyArray<T> {
+  includes(searchElement: any, fromIndex?: number): boolean
+}
+
+interface Array<T> {
+  includes(searchElement: any, fromIndex?: number): boolean
+  indexOf(searchElement: any, fromIndex?: number): number
+}
+
+declare function parseInt(string: any, radix?: number | undefined): number
