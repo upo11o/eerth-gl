@@ -20,7 +20,7 @@ gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
 
 init_printer()
 
-const camera = new_camera(0, 0, -1, 0, 0, 0, innerWidth, innerHeight, 0.1, 10, 1, 72)
+const camera = new_camera(0, 0, -3, 0, 0, 0, innerWidth, innerHeight, 0.1, 10, 1, 60)
 
 
 //////// MESH
@@ -37,8 +37,8 @@ gl.uniformMatrix4fv(gs.uniforms.matrix_view, false, camera.view)
 const model = new_mat4()
 
 const loonie_transform = {
-  position: [ 0, 0, 2 ],
-  rotation: [ -0.05, 0, 0 ],
+  position: [ 0, 0, 0 ],
+  rotation: [ 0, 0, 0 ],
   scale:    [ 1, -1, 1 ],
 } as const
 
@@ -115,18 +115,20 @@ load_ply(
 
     const s = calc_texture_size(count)
     const texels_len = s.width * s.height
-    const txt_size = texels_len * 4
+    const txt_size4 = texels_len * 4
+    const txt_size3 = texels_len * 3
 
-    pos_buf = new Float32Array(txt_size)
-    rot_buf = new Float32Array(txt_size)
-    scl_buf = new Float32Array(txt_size)
-    col_buf = new Float32Array(txt_size)
+    pos_buf = new Float32Array(txt_size3)
+    rot_buf = new Float32Array(txt_size4)
+    scl_buf = new Float32Array(txt_size3)
+    col_buf = new Float32Array(txt_size4)
     ord_buf = new Uint32Array(texels_len)
 
     const rgbaf32: Texture_Params = { internal_format: gl.RGBA32F }
-    pos_txt = new_texstore(gl, 0, s.width, s.height, rgbaf32)
+    const rgbf32: Texture_Params  = { internal_format: gl.RGB32F }
+    pos_txt = new_texstore(gl, 0, s.width, s.height, rgbf32)
     rot_txt = new_texstore(gl, 1, s.width, s.height, rgbaf32)
-    scl_txt = new_texstore(gl, 2, s.width, s.height, rgbaf32)
+    scl_txt = new_texstore(gl, 2, s.width, s.height, rgbf32)
     col_txt = new_texstore(gl, 3, s.width, s.height, rgbaf32)
     ord_txt = new_texstore(gl, 4, s.width, s.height, { internal_format: gl.R32UI }, ord_buf)
 
@@ -141,10 +143,10 @@ load_ply(
     send_camera()
   },
   data => {
-    append(pos_txt!, pos_buf!, data.position, data.offset, data.count)
-    append(rot_txt!, rot_buf!, data.rotation, data.offset, data.count)
-    append(scl_txt!, scl_buf!, data.scale,    data.offset, data.count)
-    append(col_txt!, col_buf!, data.color,    data.offset, data.count)
+    append(pos_txt!, pos_buf!, data.position, 3, data.offset, data.count)
+    append(rot_txt!, rot_buf!, data.rotation, 4, data.offset, data.count)
+    append(scl_txt!, scl_buf!, data.scale,    3, data.offset, data.count)
+    append(col_txt!, col_buf!, data.color,    4, data.offset, data.count)
 
     data_message.position = data.position
     data_message.offset = data.offset
@@ -164,17 +166,18 @@ const append = (
   txt:    Texture,
   store:  TypedArray,
   data:   TypedArray,
+  stride: number,
   offset: number,
   count:  number,
 ) => {
-  store.set(data, offset << 2)
+  store.set(data, offset * stride)
 
   const yoffset    = offset / txt.width | 0
   const new_height = ceil((offset + count) / txt.width)
   const sub_height = new_height - yoffset
 
-  const begin  = yoffset * txt.width << 2
-  const end = new_height * txt.width << 2
+  const begin  = yoffset * txt.width * stride
+  const end = new_height * txt.width * stride
   const sub_data = store.subarray(begin, end)
 
   subupload_texture(gl, txt, 0, yoffset, txt.width, sub_height, sub_data)
@@ -240,11 +243,11 @@ onpointermove = (e) => {
 const pr = min(2, devicePixelRatio)
 
 const resize = () => {
-  camera.width  = canvas.width  = innerWidth  * pr
-  camera.height = canvas.height = innerHeight * pr
+  camera.width  = canvas.width  = innerWidth  * pr | 0
+  camera.height = canvas.height = innerHeight * pr | 0
   camera_set_perspective_projection(camera)
-  gl.viewport(0, 0, canvas.width, canvas.height)
-  gl.uniform2f(gs.uniforms.viewport, canvas.width, canvas.height)
+  gl.viewport(0, 0, camera.width, camera.height)
+  gl.uniform2f(gs.uniforms.viewport, camera.width, camera.height)
   gl.uniformMatrix4fv(gs.uniforms.matrix_projection, false, camera.proj)
   // send_camera()
   request_draw()

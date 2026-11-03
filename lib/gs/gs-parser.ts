@@ -87,22 +87,28 @@ export function parser_worker() {
     const count = msg.count
     const offset = msg.offset
 
-    const position = new Float32Array(count << 2)
+    const position = new Float32Array(count * 3 | 0)
+    const scale    = new Float32Array(count * 3 | 0)
+
     const rotation = new Float32Array(count << 2)
-    const scale    = new Float32Array(count << 2)
     const color    = new Float32Array(count << 2)
 
     for (let i = 0; i < count; i++) {
       const iv = i * vertex_len | 0
+
       const j0 = i << 2
       const j1 = j0 + 1
       const j2 = j1 + 1
       const j3 = j2 + 1
 
+      const k0 = i * 3 | 0
+      const k1 = k0 + 1
+      const k2 = k1 + 1
+
       // position
-      position[j0] = data[iv + vertex_prop_offset.x]
-      position[j1] = data[iv + vertex_prop_offset.y]
-      position[j2] = data[iv + vertex_prop_offset.z]
+      position[k0] = data[iv + vertex_prop_offset.x]
+      position[k1] = data[iv + vertex_prop_offset.y]
+      position[k2] = data[iv + vertex_prop_offset.z]
 
       // color
       color[j0] = data[iv + vertex_prop_offset.f_dc_0] * SH_C0 + 0.5
@@ -111,9 +117,9 @@ export function parser_worker() {
       color[j3] = 1 / (1 + Math.exp(-data[iv + vertex_prop_offset.opacity]))
 
       //scale
-      scale[j0] = Math.exp(data[iv + vertex_prop_offset.scale_0])
-      scale[j1] = Math.exp(data[iv + vertex_prop_offset.scale_1])
-      scale[j2] = Math.exp(data[iv + vertex_prop_offset.scale_2])
+      scale[k0] = Math.exp(data[iv + vertex_prop_offset.scale_0])
+      scale[k1] = Math.exp(data[iv + vertex_prop_offset.scale_1])
+      scale[k2] = Math.exp(data[iv + vertex_prop_offset.scale_2])
 
       // rotation
       let rx = data[iv + vertex_prop_offset.rot_1]

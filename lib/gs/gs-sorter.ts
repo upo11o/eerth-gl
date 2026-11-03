@@ -16,7 +16,7 @@ export type Ply_Sorter_Input_Data = {
   type:  "data"
   delay: number
 
-  /** xyzw per splat, same layout as Ply_Parser_Output.position */
+  /** xyz per splat, same layout as Ply_Parser_Output.position */
   position: Float32Array
   offset:   number
   count:    number
@@ -65,7 +65,7 @@ export function sorter_worker() {
     if (msg.type === "header") {
       vertex_count = msg.count
       loaded = sorted = 0
-      positions = new Float32Array(vertex_count * 4)
+      positions = new Float32Array(vertex_count * 3)
       depths    = new Float32Array(vertex_count)
       keys      = new Uint16Array(vertex_count)
       ids       = new Uint32Array(vertex_count)
@@ -73,7 +73,7 @@ export function sorter_worker() {
     }
 
     if (msg.type === "data") {
-      positions.set(msg.position.subarray(0, msg.count * 4), msg.offset * 4)
+      positions.set(msg.position.subarray(0, msg.count * 3), msg.offset * 3)
       loaded = Math.max(loaded, msg.offset + msg.count)
       schedule_sort(msg.delay)
       return
@@ -136,8 +136,8 @@ export function sorter_worker() {
 
     // keep only splats in front of the camera plane
     for (let i = 0; i < loaded; i++) {
-      const i4 = i << 2
-      const depth = a * positions[i4] + b * positions[i4 + 1] + c * positions[i4 + 2] + d
+      const i3 = i * 3 | 0
+      const depth = a * positions[i3] + b * positions[i3 + 1] + c * positions[i3 + 2] + d
       if (depth <= plane) continue
       ids[n] = i
       depths[n] = depth
