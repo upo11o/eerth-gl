@@ -1,4 +1,5 @@
-import { bind_ubo, bind_vertex_data, clamp, cprints, cube_lines, draw_axis, get_icosahedron, init_printer, IOTA, mat4_rot_gx, mat4_rot_ly, mat4_scl, mat4_set_orthographic_projection, new_axis, new_mat4, new_material, new_shader, new_ubo, new_worker, prints, SQRT1_3, tris_to_lines, update_ubo } from "../lib"
+import { bind_ubo, bind_vertex_data, clamp, cube_lines, draw_axis, get_icosahedron, IOTA, mat4_rot_gx, mat4_rot_ly, mat4_scl, mat4_set_orthographic_projection, new_axis, new_mat4, new_material, new_shader, new_ubo, SQRT1_3, tris_to_lines, update_ubo } from "../lib"
+import { cprints, init_printer, new_worker, prints } from "../lib/helpers"
 
 
 declare const canvas: HTMLCanvasElement

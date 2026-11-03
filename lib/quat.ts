@@ -1,5 +1,5 @@
 import { acos, cos, min, sin, sqrt } from "./math"
-import { noop } from "./noop"
+import { noop } from "./helpers"
 import { vec4_dot } from "./vec"
 
 

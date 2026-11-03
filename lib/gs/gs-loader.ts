@@ -1,9 +1,6 @@
-import { noop } from "../noop"
 import { min } from "../math"
-import { buf_starts_with, find_in_buf } from "../bits"
-import { new_worker } from "../worker"
-import { new_stream, stream_compact, stream_dispose, stream_get_remaining_length, stream_read_f32, stream_read_u8, stream_upload, type Stream } from "./stream"
-import { parser_worker, type Ply_Parser_Input_Data, type Ply_Parser_Input_Header, type Ply_Parser_Output } from "../gs/gs-parser"
+import { buf_starts_with, find_in_buf, new_stream, new_worker, noop, stream_compact, stream_dispose, stream_get_remaining_length, stream_read_f32, stream_read_u8, stream_upload, type Stream } from "../helpers"
+import { parser_worker, type Ply_Parser_Input_Data, type Ply_Parser_Input_Header, type Ply_Parser_Output } from "./gs-parser"
 
 
 export type Ply_Property = {

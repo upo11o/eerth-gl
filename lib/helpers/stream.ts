@@ -1,4 +1,4 @@
-import { noop } from "../noop"
+import { noop } from "."
 import { max } from "../math"
 
 
