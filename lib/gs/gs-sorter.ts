@@ -13,7 +13,9 @@ export type Ply_Sorter_Input_Header = {
 }
 
 export type Ply_Sorter_Input_Data = {
-  type:     "data"
+  type:  "data"
+  delay: number
+
   /** xyzw per splat, same layout as Ply_Parser_Output.position */
   position: Float32Array
   offset:   number
@@ -21,7 +23,9 @@ export type Ply_Sorter_Input_Data = {
 }
 
 export type Ply_Sorter_Input_Camera = {
-  type:       "camera"
+  type:  "camera"
+  delay: number
+
   /** model-view matrix (view * model), splat positions are in model space */
   model_view: Float32Array
   proj:       Float32Array
@@ -56,8 +60,9 @@ export function sorter_worker() {
 
   onmessage = (e: MessageEvent<Ply_Sorter_Input_Header | Ply_Sorter_Input_Data | Ply_Sorter_Input_Camera>) => {
     const msg = e.data
+    if (!msg) return
 
-    if (msg?.type === "header") {
+    if (msg.type === "header") {
       vertex_count = msg.count
       loaded = sorted = 0
       positions = new Float32Array(vertex_count * 4)
@@ -67,17 +72,17 @@ export function sorter_worker() {
       return
     }
 
-    if (msg?.type === "data") {
+    if (msg.type === "data") {
       positions.set(msg.position.subarray(0, msg.count * 4), msg.offset * 4)
       loaded = Math.max(loaded, msg.offset + msg.count)
-      schedule_sort()
+      schedule_sort(msg.delay)
       return
     }
 
-    if (msg?.type === "camera") {
+    if (msg.type === "camera") {
       set_depth_row(msg.model_view, msg.proj)
       has_camera = true
-      schedule_sort()
+      schedule_sort(msg.delay)
     }
   }
 
@@ -109,10 +114,10 @@ export function sorter_worker() {
   }
 
   // coalesce bursts of camera/data messages into a single sort
-  const schedule_sort = () => {
+  const schedule_sort = (delay = 0) => {
     if (scheduled) return
     scheduled = true
-    setTimeout(sort, 0)
+    setTimeout(sort, delay)
   }
 
   const sort = () => {

@@ -1,4 +1,4 @@
-import { Ply_Element, Ply_Property } from "../loaders/gs-loader"
+import type { Ply_Element, Ply_Property } from "../loaders/gs-loader"
 
 declare const postMessage: Worker["postMessage"]
 
@@ -87,14 +87,14 @@ export function parser_worker() {
     const count = msg.count
     const offset = msg.offset
 
-    const position = new Float32Array(count * 4)
-    const rotation = new Float32Array(count * 4)
-    const scale    = new Float32Array(count * 4)
-    const color    = new Float32Array(count * 4)
+    const position = new Float32Array(count << 2)
+    const rotation = new Float32Array(count << 2)
+    const scale    = new Float32Array(count << 2)
+    const color    = new Float32Array(count << 2)
 
     for (let i = 0; i < count; i++) {
       const iv = i * vertex_len | 0
-      const j0 = i * 4
+      const j0 = i << 2
       const j1 = j0 + 1
       const j2 = j1 + 1
       const j3 = j2 + 1

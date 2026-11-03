@@ -1,9 +1,9 @@
+import { noop } from "../noop"
 import { min } from "../math"
 import { buf_starts_with, find_in_buf } from "../bits"
-import { new_stream, stream_compact, stream_dispose, stream_get_remaining_length, stream_read_f32, stream_read_u8, stream_upload, type Stream } from "./stream"
-import { parser_worker, Ply_Parser_Input_Data, Ply_Parser_Input_Header, Ply_Parser_Output } from "../gs/gs-parser"
-import { noop } from "../noop"
 import { new_worker } from "../worker"
+import { new_stream, stream_compact, stream_dispose, stream_get_remaining_length, stream_read_f32, stream_read_u8, stream_upload, type Stream } from "./stream"
+import { parser_worker, type Ply_Parser_Input_Data, type Ply_Parser_Input_Header, type Ply_Parser_Output } from "../gs/gs-parser"
 
 
 export type Ply_Property = {
@@ -238,7 +238,8 @@ const validate_vertex_header = (header: Ply_Element): void => {
 
   for (let i = 0; i < header.props.length; i++) {
     if (props_to_check.length === 0) {
-      throw "Invalid vertex header: " + header.props.slice(i).join(", ") + " props aren't supported"
+      const invalid_prop_names = header.props.slice(i).map(p => p.name).join(", ")
+      throw "Invalid vertex header: " + invalid_prop_names + " props aren't supported"
     }
     const prop = header.props[i]
     const id = props_to_check.indexOf(prop.name)
