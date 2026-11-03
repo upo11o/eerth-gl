@@ -1,5 +1,5 @@
 import { cos, IOTA, max, PI, sin, TAU } from "./math"
-import { new_vec3, vec3_clone, vec3_lerp, vec3_mult_scalar, vec3_normalize, vec3_set } from "./vec"
+import { new_vec3, vec3_clone, vec3_cross, vec3_lerp, vec3_mult_scalar, vec3_normalize, vec3_set, vec3_sub } from "./vec"
 
 
 const dummy3 = new_vec3()
@@ -234,10 +234,10 @@ export const get_icosahedron = (radius = 1, detail = 0) => {
   ])
 
   const indices = new Uint16Array([
-    0, 11, 5, 	0, 5, 1, 	0, 1, 7, 	0, 7, 10, 	0, 10, 11,
-    1, 5, 9, 	5, 11, 4,	11, 10, 2,	10, 7, 6,	7, 1, 8,
-    3, 9, 4, 	3, 4, 2,	3, 2, 6,	3, 6, 8,	3, 8, 9,
-    4, 9, 5, 	2, 4, 11,	6, 2, 10,	8, 6, 7,	9, 8, 1,
+    0, 11, 5,   0,  5,  1,   0,  1,  7,   0, 7, 10,   0, 10, 11,
+    1,  5, 9,   5, 11,  4,  11, 10,  2,  10, 7,  6,   7,  1,  8,
+    3,  9, 4,   3,  4,  2,   3,  2,  6,   3, 6,  8,   3,  8,  9,
+    4,  9, 5,   2,  4, 11,   6,  2, 10,   8, 6,  7,   9,  8,  1,
   ])
 
   const buffer = subdivide(positions, indices, detail)
@@ -349,4 +349,29 @@ export const tris_to_lines = <T extends number[] | TypedArray>(
   return buf instanceof Array
     ? lines as T
     : new (buf.constructor as { new (arr: number[]): T })(lines)
+}
+
+
+export const compute_normals = (position: Float32Array) => {
+  const normals = new Float32Array(position.length)
+
+  const pA = new_vec3(), pB = new_vec3(), pC = new_vec3()
+  const cb = new_vec3(), ab = new_vec3()
+
+  for (let i = 0; i < position.length; i += 9) {
+    vec3_set(pA, position[i + 0], position[i + 1], position[i + 2])
+    vec3_set(pB, position[i + 3], position[i + 4], position[i + 5])
+    vec3_set(pC, position[i + 6], position[i + 7], position[i + 8])
+
+    vec3_sub(pC, pB, cb)
+    vec3_sub(pA, pB, ab)
+    vec3_cross(cb, ab)
+    vec3_normalize(cb)
+
+    normals[i + 0] = normals[i + 3] = normals[i + 6] = cb[0]
+    normals[i + 1] = normals[i + 4] = normals[i + 7] = cb[1]
+    normals[i + 2] = normals[i + 5] = normals[i + 8] = cb[2]
+  }
+
+  return normals
 }
