@@ -226,7 +226,7 @@ export const vec3_clamp_scalar = (v: NumberArray, min_len: number, max_len: numb
 }
 
 
-export const vec3_cross = (a: NumberArray, b: NumberArray, t: NumberArray): void => {
+export const vec3_cross = (a: NumberArray, b: NumberArray, t = a): void => {
   const ax = a[0], ay = a[1], az = a[2],
         bx = b[0], by = b[1], bz = b[2]
   t[0] = ay * bz - az * by
