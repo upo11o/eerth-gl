@@ -1,1 +1,1 @@
-import "../examples/pack"
+import "../examples/3dgs"
