@@ -84,3 +84,10 @@ export const stream_read_f32 = (stream: Stream, length: number): Float32Array =>
   stream.head += length * 4
   return buf
 }
+
+/** returns a u32 view of the MUTABLE buffer, not a copy. It doesn't check length against stream remaining */
+export const stream_read_u32 = (stream: Stream, length: number): Uint32Array => {
+  const buf = new Uint32Array(stream.data.buffer, stream.head, length)
+  stream.head += length * 4
+  return buf
+}
