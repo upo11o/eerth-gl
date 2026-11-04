@@ -97,12 +97,10 @@ await ctx.watch()
 
 // if the connection drops (server restart), poll until it is back, then reload
 const reload_script = `<script>(${
-  function hmr_connect(was_down = false) {
+  function hot_reload(counter = 1) {
     fetch("/hmr")
-      .then(res => was_down
-        ? location.reload()
-        : res.body?.getReader().read().then(() => location.reload()))
-      .catch(() => setTimeout(hmr_connect, 1000, true))
+      .then(res => res.body?.getReader().read().then(() => location.reload()))
+      .catch(() => setTimeout(hot_reload, counter * 500, counter * 2))
   }
 })()</script>`
 
