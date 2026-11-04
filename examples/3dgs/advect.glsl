@@ -35,12 +35,10 @@ void main(void) {
     vec3 p = s.xyz;
     float t = s.w;
 
-    // first frame after load: start mid-cycle, so restarts are staggered per splat
+    // first frame after load: start a cycle as a soft splat
     if (t < 0.0) {
         p = p0;
-        // within the fully opaque part, so the splat does not pop to a faded alpha
-        vec2 F = flow_fade_time(f);
-        t = mix(F.x, f.limit - F.y, f.shift);
+        t = 0.0;
     }
 
     t += dt;

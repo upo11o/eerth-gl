@@ -217,6 +217,7 @@ vec4 readColor(in SplatSource source) {
 
      
 flat out vec4 color;
+flat out float solid;   // 0 = gaussian splat, 1 = solid quad
 out vec2 uv;
 
 mediump vec4 discardVec = vec4(0.0, 0.0, 2.0, 1.0);
@@ -240,7 +241,12 @@ void main(void) {
     }
 
     color = clamp(readColor(source), 0.0, 1.0);
-    if (flowing) color.a *= flow_alpha(flow_params(source.id), state.w);
+    solid = 0.0;
+    if (flowing) {
+        Flow f = flow_params(source.id);
+        solid = flow_fade_in(f, state.w);
+        color.a *= flow_fade_out(f, state.w);
+    }
     if (color.a < 1.0 / 255.0) {
       gl_Position = discardVec;
       return;
@@ -252,7 +258,8 @@ void main(void) {
         return;
     }
 
-    clipCorner(corner, color.w);
+    // clipping trims the invisible gaussian tail, a solid quad keeps its full size
+    clipCorner(corner, mix(color.w, 1.0, solid));
 
     gl_Position = center.proj + vec4(corner.offset, 0.0, 0.0);
     uv = corner.uv;

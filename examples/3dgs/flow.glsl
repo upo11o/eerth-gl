@@ -9,7 +9,6 @@ uniform vec2  flow_limit;    // min, max travel time before a restart, seconds
 
 
 struct Flow {
-    float shift;    // initial phase, fraction of limit
     float speed;
     float limit;    // travel time, seconds
 };
@@ -30,7 +29,6 @@ Flow flow_params(uint id) {
     vec4 r = vec4(pcg4d(uvec4(id, flow_seed, 0x9e3779b9u, 0x85ebca6bu)) >> 8u) * (1.0 / 16777216.0);
 
     Flow f;
-    f.shift = r.x;
     f.speed = mix(flow_speed.x, flow_speed.y, r.y);
     f.limit = mix(flow_limit.x, flow_limit.y, r.z);
     return f;
@@ -43,12 +41,18 @@ vec2 flow_fade_time(Flow f) {
 }
 
 
-// fades in after a restart and fades out before it
-float flow_alpha(Flow f, float t) {
-    if (t < 0.0) return 1.0;
-    vec2 F = flow_fade_time(f);
-    // smoothstep is undefined for equal edges
-    float fade_in  = F.x > 0.0 ? smoothstep(0.0, F.x, t) : 1.0;
-    float fade_out = F.y > 0.0 ? smoothstep(f.limit, f.limit - F.y, t) : 1.0;
-    return min(fade_in, fade_out);
+// smoothstep is undefined for equal edges, so 0 fade time is handled apart
+
+// 0 -> 1 after a restart, morphs a gaussian splat into a solid quad
+float flow_fade_in(Flow f, float t) {
+    float F = flow_fade_time(f).x;
+    if (t < 0.0) return 0.0; // just loaded, soft
+    return F <= 0.0 ? 1.0 : smoothstep(0.0, F, t);
+}
+
+
+// 1 -> 0 before a restart, alpha
+float flow_fade_out(Flow f, float t) {
+    float F = flow_fade_time(f).y;
+    return t < 0.0 || F <= 0.0 ? 1.0 : smoothstep(f.limit, f.limit - F, t);
 }

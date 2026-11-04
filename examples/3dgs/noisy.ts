@@ -4,7 +4,7 @@ import { cprints, init_printer, new_worker } from "../../lib/helpers"
 
 import advect_src from "./advect.glsl"
 import flow_src from "./flow.glsl"
-import frag from "./frag.glsl"
+import frag from "./noisy-frag.glsl"
 import vert_src from "./noisy-vert.glsl"
 import psrdnoise_src from "./psrdnoise3.glsl"
 
@@ -54,7 +54,7 @@ const model = new_mat4()
 
 const loonie_transform = {
   position: [ 0, 0, 0 ],
-  rotation: [ 0, 0, 0 ],
+  rotation: [ -0.5, 1.5, 0 ],
   scale:    [ 1, -1, 1 ],
 } as const
 
@@ -222,10 +222,10 @@ let noise_rt: Feedback_Render_Target
 
 // per splat values are picked between [ min, max ] by a hash of its id and seed
 const flow = {
-  /** salt of the per splat hash, change it to reroll shift, speed and limit of every splat */
+  /** salt of the per splat hash, change it to reroll speed and limit of every splat */
   seed:   1,
-  /** [ in, out ] each 0..0.5, share of the limit spent fading in after a restart and fading out before it, 0 means no fade */
-  fade:   [ 0.1, 0.5 ],
+  /** [ in, out ] each 0..0.5, share of the limit spent morphing from a gaussian splat into a solid quad after a restart, and fading alpha out before it, 0 means instant */
+  fade:   [ 0.5, 0.5 ],
   /** [ min, max ] multiplier of the curl velocity, the raw curl is not normalized, so tune by eye */
   speed:  [ 0.001, 0.01 ],
   /** [ min, max ] seconds a splat travels before it restarts from its origin */
