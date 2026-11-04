@@ -1,12 +1,12 @@
-import { bind_quad_vao, calc_texture_size, camera_set_perspective_projection, ceil, clamp, IOTA, mat4_compose_prs, max, mat4_mult, mat4_rot_gx, mat4_rot_ly, min, new_camera, new_feedback_render_target, new_mat4, new_material, new_quad_material, new_texstore, render_quad, subupload_texture, swap_feedback_render_target, use_texture, type Feedback_Render_Target, type Material, type Texture_Params, type Texture } from "../../lib"
-import { load_ply, type Ply_Parser_Output, type Ply_Sorter_Input_Camera, type Ply_Sorter_Input_Data, type Ply_Sorter_Input_Header, type Ply_Sorter_Output, sorter_worker } from "../../lib/gs"
-import { cprints, init_printer, new_worker } from "../../lib/helpers"
+import { bind_quad_vao, calc_texture_size, camera_set_perspective_projection, ceil, clamp, IOTA, mat4_compose_prs, max, mat4_mult, mat4_rot_gx, mat4_rot_ly, min, new_camera, new_feedback_render_target, new_mat4, new_material, new_quad_material, new_texstore, render_quad, subupload_texture, swap_feedback_render_target, use_texture, type Feedback_Render_Target, type Material, type Texture_Params, type Texture } from "../../../lib"
+import { load_ply, type Ply_Parser_Output, type Ply_Sorter_Input_Camera, type Ply_Sorter_Input_Data, type Ply_Sorter_Input_Header, type Ply_Sorter_Output, sorter_worker } from "../../../lib/gs"
+import { cprints, init_printer, new_worker } from "../../../lib/helpers"
 
-import advect_src from "./advect.glsl"
-import flow_src from "./flow.glsl"
-import frag from "./noisy-frag.glsl"
-import vert_src from "./noisy-vert.glsl"
 import psrdnoise_src from "./psrdnoise3.glsl"
+import flow_src from "./flow.glsl"
+import advect_src from "./advect.glsl"
+import vert_src from "./vert.glsl"
+import frag_src from "./frag.glsl"
 
 
 
@@ -45,7 +45,7 @@ gl.bindVertexArray(vao)
 
 type Flow_Uniform = "flow_seed" | "flow_fade" | "flow_speed" | "flow_limit"
 
-const gs = new_material<never, Flow_Uniform | "splats_count" | "viewport" | "matrix_model" | "matrix_view" | "matrix_projection" | "position_map" | "state_map" | "flow_id_map" | "flow_order_map" | "flowing" | "rotation_map" | "scale_map" | "color_map" | "order_map">(gl, vert, frag)!
+const gs = new_material<never, Flow_Uniform | "splats_count" | "viewport" | "matrix_model" | "matrix_view" | "matrix_projection" | "position_map" | "state_map" | "flow_id_map" | "flow_order_map" | "flowing" | "rotation_map" | "scale_map" | "color_map" | "order_map">(gl, vert, frag_src)!
 gl.useProgram(gs.id)
 
 gl.uniformMatrix4fv(gs.uniforms.matrix_view, false, camera.view)
