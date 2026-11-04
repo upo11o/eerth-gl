@@ -5,9 +5,55 @@ declare const postMessage: Worker["postMessage"]
 
 
 /**
- * Compressed ply (PlayCanvas / splat-transform format):
- *   element chunk N  - float min/max bounds per 256 splats
- *   element vertex M - uint packed_position, packed_rotation, packed_scale, packed_color
+ * Compressed ply (PlayCanvas / splat-transform format)
+ *
+ * Header layout (binary_little_endian):
+ *
+ *   element chunk N            N = ceil(M / 256), one chunk per 256 consecutive splats
+ *     property float min_x     position bounds
+ *     property float min_y
+ *     property float min_z
+ *     property float max_x
+ *     property float max_y
+ *     property float max_z
+ *     property float min_scale_x   log-scale bounds
+ *     property float min_scale_y
+ *     property float min_scale_z
+ *     property float max_scale_x
+ *     property float max_scale_y
+ *     property float max_scale_z
+ *     property float min_r     color bounds (optional, older files have none -> 0..1)
+ *     property float min_g
+ *     property float min_b
+ *     property float max_r
+ *     property float max_g
+ *     property float max_b
+ *   element vertex M
+ *     property uint packed_position
+ *     property uint packed_rotation
+ *     property uint packed_scale
+ *     property uint packed_color
+ *   element sh M               optional, uchar f_rest_* (higher SH bands), ignored here
+ *
+ * Splat i belongs to chunk i >> 8. Every packed field is a normalized
+ * value t in [0, 1] interpolated between chunk's min and max: lerp(min, max, t).
+ *
+ * packed_position, 11-10-11 bits (MSB -> LSB):
+ *   [31..21] x / 2047   [20..11] y / 1023   [10..0] z / 2047
+ *
+ * packed_scale, 11-10-11 bits, same layout as position.
+ *   Result is in log space, real scale = exp(lerp(min_scale, max_scale, t))
+ *
+ * packed_color, 8-8-8-8 bits:
+ *   [31..24] r   [23..16] g   [15..8] b   [7..0] a   (each / 255)
+ *   rgb is lerp(min_rgb, max_rgb, t) = f_dc * SH_C0 + 0.5 (base color, not raw SH)
+ *   a is already sigmoid(opacity), no chunk bounds
+ *
+ * packed_rotation, 2-10-10-10 bits, "smallest three" quaternion encoding:
+ *   [31..30] index of the largest component (in rot_0..rot_3 order, rot_0 = w)
+ *   [29..20] [19..10] [9..0] remaining 3 components in order,
+ *     each decoded as (v / 1023 - 0.5) * sqrt(2), i.e. in [-1/sqrt(2), 1/sqrt(2)]
+ *   largest component = sqrt(1 - a² - b² - c²), always positive
  */
 
 export type Ply_Decompresser_Input_Chunks = {
