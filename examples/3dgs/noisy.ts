@@ -43,7 +43,7 @@ const camera = new_camera(0, 0, -3, 0, 0, 0, innerWidth, innerHeight, 0.1, 10, 1
 const vao = gl.createVertexArray()
 gl.bindVertexArray(vao)
 
-type Flow_Uniform = "flow_seed" | "flow_fade" | "flow_cycle" | "flow_speed" | "flow_limit"
+type Flow_Uniform = "flow_seed" | "flow_fade" | "flow_speed" | "flow_limit"
 
 const gs = new_material<never, Flow_Uniform | "splats_count" | "viewport" | "matrix_model" | "matrix_view" | "matrix_projection" | "position_map" | "state_map" | "rotation_map" | "scale_map" | "color_map" | "order_map">(gl, vert, frag)!
 gl.useProgram(gs.id)
@@ -124,7 +124,7 @@ let loaded_splats_num = 0
 let draw_splats_num = 0
 
 load_ply(
-  "./assets/loonie.ply",
+  "./assets/cliff.ply",
   (header, count) => {
     total_splats_num = count
     console.log("HEADER", header)
@@ -220,14 +220,20 @@ const append = (
 const STATE_UNIT = 5
 let noise_rt: Feedback_Render_Target
 
+// per splat values are picked between [ min, max ] by a hash of its id and seed
 const flow = {
+  /** salt of the per splat hash, change it to reroll shift, speed and limit of every splat */
   seed:   1,
-  fade:   0.3,
-  cycle:  6,
+  /** [ in, out ] each 0..0.5, share of the limit spent fading in after a restart and fading out before it, 0 means no fade */
+  fade:   [ 0.1, 0.5 ],
+  /** [ min, max ] multiplier of the curl velocity, the raw curl is not normalized, so tune by eye */
   speed:  [ 0.001, 0.01 ],
-  limit:  [ 0.05, 0.25 ],
-  freq:   1.5,
-  evolve: 0.3,
+  /** [ min, max ] seconds a splat travels before it restarts from its origin */
+  limit:  [ 4.2, 7.8 ],
+  /** noise frequency, higher gives smaller and tighter swirls */
+  freq:   0.5,
+  /** how fast the field itself changes over time (gradient rotation per second), 0 freezes it into fixed streamlines */
+  evolve: 0.1,
 }
 
 const advect = new_quad_material<Flow_Uniform | "state_map" | "position_map" | "loaded_count" | "dt" | "flow_time" | "flow_freq" | "flow_evolve">(gl, advect_frag)
@@ -235,8 +241,7 @@ const advect = new_quad_material<Flow_Uniform | "state_map" | "position_map" | "
 const set_flow_uniforms = (m: Material<never, Flow_Uniform>) => {
   gl.useProgram(m.id)
   gl.uniform1ui(m.uniforms.flow_seed, flow.seed)
-  gl.uniform1f(m.uniforms.flow_fade, flow.fade)
-  gl.uniform1f(m.uniforms.flow_cycle, flow.cycle)
+  gl.uniform2fv(m.uniforms.flow_fade, flow.fade)
   gl.uniform2fv(m.uniforms.flow_speed, flow.speed)
   gl.uniform2fv(m.uniforms.flow_limit, flow.limit)
 }

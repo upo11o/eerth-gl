@@ -229,7 +229,6 @@ void main(void) {
         return;
     }
 
-    vec3 origin = readCenter(source);
     vec4 state = texelFetch(state_map, source.uv, 0);
     vec3 modelCenter = state.xyz;
 
@@ -240,7 +239,7 @@ void main(void) {
     }
 
     color = clamp(readColor(source), 0.0, 1.0);
-    color.a *= flow_alpha(flow_params(source.id), state.w, distance(modelCenter, origin));
+    color.a *= flow_alpha(flow_params(source.id), state.w);
     if (color.a < 1.0 / 255.0) {
       gl_Position = discardVec;
       return;

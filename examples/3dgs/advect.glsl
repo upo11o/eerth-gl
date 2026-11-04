@@ -38,13 +38,15 @@ void main(void) {
     // first frame after load: start mid-cycle, so restarts are staggered per splat
     if (t < 0.0) {
         p = p0;
-        t = mix(flow_fade, 0.8 * f.duration, f.shift);
+        // within the fully opaque part, so the splat does not pop to a faded alpha
+        vec2 F = flow_fade_time(f);
+        t = mix(F.x, f.limit - F.y, f.shift);
     }
 
     t += dt;
     p += curl(p * flow_freq, flow_time * flow_evolve) * f.speed * dt;
 
-    if (t > f.duration || distance(p, p0) > f.limit) {
+    if (t > f.limit) {
         p = p0;
         t = 0.0;
     }

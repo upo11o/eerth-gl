@@ -3,17 +3,15 @@
 
 
 uniform uint  flow_seed;
-uniform float flow_fade;     // fade in/out time, seconds
-uniform float flow_cycle;    // mean cycle duration, seconds
+uniform vec2  flow_fade;     // in, out, each 0..0.5, share of limit spent fading
 uniform vec2  flow_speed;    // min, max
-uniform vec2  flow_limit;    // min, max distance from origin
+uniform vec2  flow_limit;    // min, max travel time before a restart, seconds
 
 
 struct Flow {
-    float shift;    // initial phase, fraction of duration
+    float shift;    // initial phase, fraction of limit
     float speed;
-    float limit;
-    float duration;
+    float limit;    // travel time, seconds
 };
 
 
@@ -32,19 +30,25 @@ Flow flow_params(uint id) {
     vec4 r = vec4(pcg4d(uvec4(id, flow_seed, 0x9e3779b9u, 0x85ebca6bu)) >> 8u) * (1.0 / 16777216.0);
 
     Flow f;
-    f.shift    = r.x;
-    f.speed    = mix(flow_speed.x, flow_speed.y, r.y);
-    f.limit    = mix(flow_limit.x, flow_limit.y, r.z);
-    f.duration = flow_cycle * mix(0.7, 1.3, r.w);
+    f.shift = r.x;
+    f.speed = mix(flow_speed.x, flow_speed.y, r.y);
+    f.limit = mix(flow_limit.x, flow_limit.y, r.z);
     return f;
 }
 
 
-// fades out before a restart (by time or distance) and fades in after it
-float flow_alpha(Flow f, float t, float dist) {
+// seconds of fade in after a restart (x) and of fade out before it (y)
+vec2 flow_fade_time(Flow f) {
+    return clamp(flow_fade, 0.0, 0.5) * f.limit;
+}
+
+
+// fades in after a restart and fades out before it
+float flow_alpha(Flow f, float t) {
     if (t < 0.0) return 1.0;
-    return min(
-        min(smoothstep(0.0, flow_fade, t), smoothstep(f.duration, f.duration - flow_fade, t)),
-        smoothstep(f.limit, 0.85 * f.limit, dist)
-    );
+    vec2 F = flow_fade_time(f);
+    // smoothstep is undefined for equal edges
+    float fade_in  = F.x > 0.0 ? smoothstep(0.0, F.x, t) : 1.0;
+    float fade_out = F.y > 0.0 ? smoothstep(f.limit, f.limit - F.y, t) : 1.0;
+    return min(fade_in, fade_out);
 }
