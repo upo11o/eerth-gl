@@ -1,6 +1,7 @@
 import { min } from "../math"
-import { buf_starts_with, find_in_buf, new_stream, new_worker, noop, stream_compact, stream_dispose, stream_get_remaining_length, stream_read_f32, stream_read_u8, stream_upload, type Stream } from "../helpers"
+import { buf_starts_with, find_in_buf, new_stream, new_worker, noop, stream_compact, stream_dispose, stream_get_remaining_length, stream_read_f32, stream_read_u32, stream_read_u8, stream_upload, type Stream } from "../helpers"
 import { parser_worker, type Ply_Parser_Input_Data, type Ply_Parser_Input_Header, type Ply_Parser_Output } from "./gs-parser"
+import { decompresser_worker, type Ply_Decompresser_Input_Chunks, type Ply_Decompresser_Input_Data } from "./gs-decompresser"
 
 
 export type Ply_Property = {
@@ -57,14 +58,36 @@ export const load_ply = async (
     if (!vertex_header) {
       throw "No vertex header"
     }
-    validate_vertex_header(vertex_header)
+    const chunk_header = header.elements.find(e => e.name === "chunk")
+    const is_compressed = !!chunk_header
+    if (is_compressed) {
+      validate_compressed_headers(header, chunk_header, vertex_header)
+    } else {
+      validate_vertex_header(vertex_header)
+    }
     on_header(header, vertex_header.count)
 
     //// prepare vertex parser worker
-    worker = new_worker(`(${parser_worker})()`)
+    if (is_compressed) {
+      worker = new_worker(`(${decompresser_worker})()`)
 
-    const header_message: Ply_Parser_Input_Header = { type: "header", ...vertex_header }
-    worker.postMessage(header_message)
+      const chunks = new Float32Array(chunk_header.count * chunk_header.props.length)
+      await read_vertex_data(stream, chunk_header, false, (data, offset) => {
+        chunks.set(data, offset * chunk_header.props.length)
+      })
+      const chunks_message: Ply_Decompresser_Input_Chunks = {
+        type:  "chunks",
+        props: chunk_header.props,
+        data:  chunks,
+        count: chunk_header.count,
+      }
+      worker.postMessage(chunks_message, [ chunks.buffer ])
+    } else {
+      worker = new_worker(`(${parser_worker})()`)
+
+      const header_message: Ply_Parser_Input_Header = { type: "header", ...vertex_header }
+      worker.postMessage(header_message)
+    }
 
     worker.onmessage = (e: MessageEvent<Ply_Parser_Output>) => {
       on_data(e.data)
@@ -75,9 +98,9 @@ export const load_ply = async (
     }
 
     //// read vertex data
-    await read_vertex_data(stream, vertex_header, (data, offset, count) => {
-      const data_message: Ply_Parser_Input_Data = { type: "data", data, count, offset }
-      worker?.postMessage(data_message, [ data.buffer ])
+    await read_vertex_data(stream, vertex_header, is_compressed, (data, offset, count) => {
+      const msg = { type: "data", data, count, offset } as Ply_Parser_Input_Data | Ply_Decompresser_Input_Data
+      worker?.postMessage(msg, [ data.buffer ])
     })
   }
   catch (e) {
@@ -173,7 +196,8 @@ const read_header = async (stream: Stream): Promise<Ply_Header> => {
 const read_vertex_data = async (
   stream: Stream,
   vertex_header: Ply_Element,
-  on_data: (data: Float32Array, offset: number, count: number) => void,
+  is_compressed: boolean,
+  on_data: (data: Uint32Array | Float32Array, offset: number, count: number) => void,
 ): Promise<void> => {
 
   const props = vertex_header.props
@@ -181,6 +205,8 @@ const read_vertex_data = async (
   const vertex_length = props.length
   const vertex_byte_length = vertex_length << 2
   let cursor = 0
+
+  const read_stream_data = is_compressed ? stream_read_u32 : stream_read_f32
 
   while (cursor < count) {
     const remaining = stream_get_remaining_length(stream)
@@ -190,7 +216,7 @@ const read_vertex_data = async (
     }
 
     const vertices_to_read = min(remaining / vertex_byte_length | 0, count - cursor)
-    const data = stream_read_f32(stream, vertices_to_read * vertex_length).slice()
+    const data = read_stream_data(stream, vertices_to_read * vertex_length).slice()
     stream_compact(stream)
     on_data(data, cursor, vertices_to_read)
 
@@ -247,5 +273,44 @@ const validate_vertex_header = (header: Ply_Element): void => {
 
   if (props_to_check.length) {
     throw "Invalid vertex header: " + props_to_check.join(", ") + " props are required"
+  }
+}
+
+
+const required_chunk_props = [
+  "min_x", "min_y", "min_z",
+  "max_x", "max_y", "max_z",
+  "min_scale_x", "min_scale_y", "min_scale_z",
+  "max_scale_x", "max_scale_y", "max_scale_z",
+] as const
+
+const required_packed_props = [
+  "packed_position", "packed_rotation", "packed_scale", "packed_color",
+] as const
+
+
+const validate_compressed_headers = (header: Ply_Header, chunk_header: Ply_Element, vertex_header: Ply_Element): void => {
+  if (header.elements[0] !== chunk_header || header.elements[1] !== vertex_header) {
+    throw "Invalid compressed header: 'chunk' and 'vertex' must be the first elements"
+  }
+  if (chunk_header.count !== Math.ceil(vertex_header.count / 256)) {
+    throw "Invalid compressed header: chunk count doesn't match vertex count"
+  }
+
+  for (const prop of chunk_header.props) {
+    if (prop.type !== "float") {
+      throw `Invalid chunk header: '${prop.name}' prop must be float`
+    }
+  }
+  const missing_chunk_props = required_chunk_props.filter(name => !chunk_header.props.some(p => p.name === name))
+  if (missing_chunk_props.length) {
+    throw "Invalid chunk header: " + missing_chunk_props.join(", ") + " props are required"
+  }
+
+  if (
+    vertex_header.props.length !== required_packed_props.length ||
+    vertex_header.props.some((p, i) => p.name !== required_packed_props[i] || p.type !== "uint")
+  ) {
+    throw "Invalid compressed vertex header: expected uint " + required_packed_props.join(", ")
   }
 }
