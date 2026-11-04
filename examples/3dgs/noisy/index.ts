@@ -330,14 +330,14 @@ const pick_flowing = (data: Ply_Parser_Output) => {
 
 // per splat values are picked between [ min, max ] by a hash of its id and seed
 const flow = {
-  /** salt of the per splat hash, change it to reroll speed and limit of every splat */
-  seed:   1,
+  /** salt of the per splat hash and of the noise field, change it to reroll speed and limit of every splat and get another flow field */
+  seed:   5,
   /** [ in, out ] each 0..0.5, share of the limit spent morphing from a gaussian splat into a solid quad after a restart, and fading alpha out before it, 0 means instant */
   fade:   [ 0.5, 0.5 ],
   /** [ min, max ] multiplier of the curl velocity, the raw curl is not normalized, so tune by eye */
   speed:  [ 0.001, 0.01 ],
   /** [ min, max ] seconds a splat travels before it restarts from its origin */
-  limit:  [ 2, 10 ],
+  limit:  [ 1, 5 ],
   /** [ min, max ] largest scale axis (model space) of a splat that flows, the rest only stay at origin */
   scale:  [ 0.001, 0.01 ],
   /** noise frequency, higher gives smaller and tighter swirls */

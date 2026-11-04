@@ -46,8 +46,13 @@ void main(void) {
         t = 0.0;
     }
 
+    // seed picks another region of noise space and gradient rotation, so another field
+    vec4 r = vec4(pcg4d(uvec4(flow_seed, 0x2545f491u, 0x68e31da4u, 0xb5297a4du)) >> 8u) * (1.0 / 16777216.0);
+    vec3 field_offset = r.xyz * 256.0;
+    float field_phase = r.w * 6.2831853;
+
     t += dt;
-    p += curl(p * flow_freq, flow_time * flow_evolve) * f.speed * dt;
+    p += curl(p * flow_freq + field_offset, flow_time * flow_evolve + field_phase) * f.speed * dt;
 
     if (t > f.limit) {
         p = p0;
