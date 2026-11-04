@@ -10,6 +10,7 @@ uniform uint splats_count;
 
 uniform sampler2D position_map;
 uniform sampler2D state_map;
+uniform bool flowing;   // false draws splats at their origin, unfaded
 uniform sampler2D scale_map;
 uniform sampler2D rotation_map;
 uniform sampler2D color_map;
@@ -230,7 +231,7 @@ void main(void) {
     }
 
     vec4 state = texelFetch(state_map, source.uv, 0);
-    vec3 modelCenter = state.xyz;
+    vec3 modelCenter = flowing ? state.xyz : readCenter(source);
 
     SplatCenter center;
     if (!initCenter(source, modelCenter, center)) {
@@ -239,7 +240,7 @@ void main(void) {
     }
 
     color = clamp(readColor(source), 0.0, 1.0);
-    color.a *= flow_alpha(flow_params(source.id), state.w);
+    if (flowing) color.a *= flow_alpha(flow_params(source.id), state.w);
     if (color.a < 1.0 / 255.0) {
       gl_Position = discardVec;
       return;

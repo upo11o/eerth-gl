@@ -45,7 +45,7 @@ gl.bindVertexArray(vao)
 
 type Flow_Uniform = "flow_seed" | "flow_fade" | "flow_speed" | "flow_limit"
 
-const gs = new_material<never, Flow_Uniform | "splats_count" | "viewport" | "matrix_model" | "matrix_view" | "matrix_projection" | "position_map" | "state_map" | "rotation_map" | "scale_map" | "color_map" | "order_map">(gl, vert, frag)!
+const gs = new_material<never, Flow_Uniform | "splats_count" | "viewport" | "matrix_model" | "matrix_view" | "matrix_projection" | "position_map" | "state_map" | "flowing" | "rotation_map" | "scale_map" | "color_map" | "order_map">(gl, vert, frag)!
 gl.useProgram(gs.id)
 
 gl.uniformMatrix4fv(gs.uniforms.matrix_view, false, camera.view)
@@ -296,6 +296,11 @@ const frame = (now: number) => {
   use_texture(gl, noise_rt.read)
   gl.bindFramebuffer(gl.FRAMEBUFFER, null)
   gl.viewport(0, 0, camera.width, camera.height)
+
+  // origins first, flowing splats blend over them
+  gl.uniform1i(gs.uniforms.flowing, 0)
+  gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, draw_splats_num)
+  gl.uniform1i(gs.uniforms.flowing, 1)
   gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, draw_splats_num)
 }
 
