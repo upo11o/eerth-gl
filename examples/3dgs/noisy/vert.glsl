@@ -23,6 +23,10 @@ uniform mat4 matrix_model;
 uniform mat4 matrix_view;
 uniform mat4 matrix_projection;
 
+uniform vec3  light_dir;        // world space, from a surface towards the light
+uniform float light_shininess;  // specular exponent, higher gives shorter, sharper blinks
+uniform float light_intensity;  // brightness added at the peak of a blink
+
 //#include flow
 
 
@@ -221,6 +225,14 @@ void clipCorner(inout SplatCorner corner, float alpha) {
 }
 
 
+// model space, the shortest axis of a flat splat is its normal
+vec3 readNormal(in SplatSource source) {
+    mat3 rot = quatToMat3(texelFetch(rotation_map, source.uv, 0).wxyz);
+    vec3 s = texelFetch(scale_map, source.uv, 0).xyz;
+    return s.x < s.y ? (s.x < s.z ? rot[0] : rot[2]) : (s.y < s.z ? rot[1] : rot[2]);
+}
+
+
 vec4 readColor(in SplatSource source) {
     return texelFetch(color_map, source.uv, 0);
 }
@@ -256,6 +268,16 @@ void main(void) {
         Flow f = flow_params(source.id);
         solid = flow_fade_in(f, state.w);
         color.a *= flow_fade_out(f, state.w);
+
+        // blinn-phong specular in view space, the model matrix is a rotation with flips, so it transforms normals as is
+        vec3 n = normalize(mat3(center.modelView) * readNormal(source));
+        // a splat has no front side, turn the normal to the camera
+        if (dot(n, center.view) > 0.0) n = -n;
+        vec3 l = normalize(mat3(matrix_view) * light_dir);
+        vec3 h = normalize(l - normalize(center.view));
+        float spec = pow(max(dot(n, h), 0.0), light_shininess);
+        // added on top of the color, lit along with the morph, so a soft splat after a restart matches its origin
+        color.rgb += spec * light_intensity * solid;
     }
     if (color.a < 1.0 / 255.0) {
       gl_Position = discardVec;
@@ -269,7 +291,8 @@ void main(void) {
     }
 
     // clipping trims the invisible gaussian tail, a solid quad keeps its full size
-    clipCorner(corner, mix(color.w, 1.0, solid));
+    // clipCorner(corner, mix(color.w, 1.0, solid));
+    clipCorner(corner, color.w);
 
     gl_Position = center.proj + vec4(corner.offset, 0.0, 0.0);
     uv = corner.uv;

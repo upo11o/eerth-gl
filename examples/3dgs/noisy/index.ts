@@ -45,7 +45,7 @@ gl.bindVertexArray(vao)
 
 type Flow_Uniform = "flow_seed" | "flow_fade" | "flow_speed" | "flow_limit"
 
-const gs = new_material<never, Flow_Uniform | "splats_count" | "viewport" | "matrix_model" | "matrix_view" | "matrix_projection" | "position_map" | "state_map" | "flow_id_map" | "flow_order_map" | "flowing" | "rotation_map" | "scale_map" | "color_map" | "order_map">(gl, vert, frag_src)!
+const gs = new_material<never, Flow_Uniform | "splats_count" | "viewport" | "matrix_model" | "matrix_view" | "matrix_projection" | "position_map" | "state_map" | "flow_id_map" | "flow_order_map" | "flowing" | "light_dir" | "light_shininess" | "light_intensity" | "rotation_map" | "scale_map" | "color_map" | "order_map">(gl, vert, frag_src)!
 gl.useProgram(gs.id)
 
 gl.uniformMatrix4fv(gs.uniforms.matrix_view, false, camera.view)
@@ -341,7 +341,7 @@ const flow = {
   /** [ min, max ] largest scale axis (model space) of a splat that flows, the rest only stay at origin */
   scale:  [ 0.001, 0.01 ],
   /** noise frequency, higher gives smaller and tighter swirls */
-  freq:   0.5,
+  freq:   0.6,
   /** how fast the field itself changes over time (gradient rotation per second), 0 freezes it into fixed streamlines */
   evolve: 0.1,
 }
@@ -370,6 +370,19 @@ gl.uniform1i(gs.uniforms.state_map, STATE_UNIT)
 gl.uniform1i(gs.uniforms.flow_id_map, FLOW_IDS_UNIT)
 gl.uniform1i(gs.uniforms.flow_order_map, FLOW_ORDER_UNIT)
 
+// flowing splats blink when their glint points at the camera, origins keep their baked color
+const light = {
+  /** world space direction from a surface towards the light, normalized in the shader */
+  dir:       [ 0, 1, -0.5 ],
+  /** specular exponent, higher gives shorter, sharper blinks */
+  shininess: 128,
+  /** brightness added at the peak of a blink */
+  intensity: 1,
+}
+
+gl.uniform3fv(gs.uniforms.light_dir, light.dir)
+gl.uniform1f(gs.uniforms.light_shininess, light.shininess)
+gl.uniform1f(gs.uniforms.light_intensity, light.intensity)
 const advect_step = (time: number, dt: number) => {
   gl.useProgram(advect.id)
   bind_quad_vao(gl)
