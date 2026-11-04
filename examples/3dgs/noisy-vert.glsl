@@ -10,7 +10,9 @@ uniform uint splats_count;
 
 uniform sampler2D position_map;
 uniform sampler2D state_map;
-uniform bool flowing;   // false draws splats at their origin, unfaded
+uniform usampler2D flow_id_map;
+uniform usampler2D flow_order_map;  // flowing slots, back to front
+uniform bool flowing;   // false draws all splats at their origin unfaded, true draws flowing slots
 uniform sampler2D scale_map;
 uniform sampler2D rotation_map;
 uniform sampler2D color_map;
@@ -25,10 +27,11 @@ uniform mat4 matrix_projection;
 
 
 struct SplatSource {
-    uint order;         
-    uint id;            
-    ivec2 uv;           
-    vec2 cornerUV;      
+    uint order;
+    uint id;
+    ivec2 uv;
+    vec2 cornerUV;
+    ivec2 slotUV;       // state texel, flowing only
 };
 
 
@@ -59,7 +62,14 @@ bool initSource(out SplatSource source) {
     uint w = uint(textureSize(order_map, 0).x);
     ivec2 orderUV = ivec2(source.order % w, source.order / w);
 
-    source.id = texelFetch(order_map, orderUV, 0).r;
+    if (flowing) {
+        uint fw = uint(textureSize(flow_order_map, 0).x);
+        uint slot = texelFetch(flow_order_map, ivec2(source.order % fw, source.order / fw), 0).r;
+        source.slotUV = ivec2(slot % fw, slot / fw);
+        source.id = texelFetch(flow_id_map, source.slotUV, 0).r;
+    } else {
+        source.id = texelFetch(order_map, orderUV, 0).r;
+    }
     source.uv = ivec2(source.id % w, source.id / w);
     source.cornerUV = vec2[](vec2(-1,-1), vec2(1,-1), vec2(-1,1), vec2(1,1))[gl_VertexID];
 
@@ -231,7 +241,7 @@ void main(void) {
         return;
     }
 
-    vec4 state = texelFetch(state_map, source.uv, 0);
+    vec4 state = flowing ? texelFetch(state_map, source.slotUV, 0) : vec4(0.0);
     vec3 modelCenter = flowing ? state.xyz : readCenter(source);
 
     SplatCenter center;

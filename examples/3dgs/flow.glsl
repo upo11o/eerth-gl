@@ -1,4 +1,5 @@
 // shared by advect.glsl and noisy-vert.glsl
+// state holds only flowing splats, compacted into slots, flow_id_map gives the splat id of a slot
 // state texel: xyz = current position, w = cycle phase t in seconds, t < 0 = just loaded
 
 

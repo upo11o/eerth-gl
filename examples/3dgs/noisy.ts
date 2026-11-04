@@ -1,5 +1,5 @@
-import { bind_quad_vao, calc_texture_size, camera_set_perspective_projection, ceil, clamp, IOTA, mat4_compose_prs, mat4_mult, mat4_rot_gx, mat4_rot_ly, min, new_camera, new_feedback_render_target, new_mat4, new_material, new_quad_material, new_texstore, render_quad, subupload_texture, swap_feedback_render_target, use_texture, type Feedback_Render_Target, type Material, type Texture_Params, type Texture } from "../../lib"
-import { load_ply, type Ply_Sorter_Input_Camera, type Ply_Sorter_Input_Data, type Ply_Sorter_Input_Header, type Ply_Sorter_Output, sorter_worker } from "../../lib/gs"
+import { bind_quad_vao, calc_texture_size, camera_set_perspective_projection, ceil, clamp, IOTA, mat4_compose_prs, max, mat4_mult, mat4_rot_gx, mat4_rot_ly, min, new_camera, new_feedback_render_target, new_mat4, new_material, new_quad_material, new_texstore, render_quad, subupload_texture, swap_feedback_render_target, use_texture, type Feedback_Render_Target, type Material, type Texture_Params, type Texture } from "../../lib"
+import { load_ply, type Ply_Parser_Output, type Ply_Sorter_Input_Camera, type Ply_Sorter_Input_Data, type Ply_Sorter_Input_Header, type Ply_Sorter_Output, sorter_worker } from "../../lib/gs"
 import { cprints, init_printer, new_worker } from "../../lib/helpers"
 
 import advect_src from "./advect.glsl"
@@ -45,7 +45,7 @@ gl.bindVertexArray(vao)
 
 type Flow_Uniform = "flow_seed" | "flow_fade" | "flow_speed" | "flow_limit"
 
-const gs = new_material<never, Flow_Uniform | "splats_count" | "viewport" | "matrix_model" | "matrix_view" | "matrix_projection" | "position_map" | "state_map" | "flowing" | "rotation_map" | "scale_map" | "color_map" | "order_map">(gl, vert, frag)!
+const gs = new_material<never, Flow_Uniform | "splats_count" | "viewport" | "matrix_model" | "matrix_view" | "matrix_projection" | "position_map" | "state_map" | "flow_id_map" | "flow_order_map" | "flowing" | "rotation_map" | "scale_map" | "color_map" | "order_map">(gl, vert, frag)!
 gl.useProgram(gs.id)
 
 gl.uniformMatrix4fv(gs.uniforms.matrix_view, false, camera.view)
@@ -54,7 +54,7 @@ const model = new_mat4()
 
 const loonie_transform = {
   position: [ 0, 0, 0 ],
-  rotation: [ -0.5, 1.5, 0 ],
+  rotation: [ 0, 0, 0 ],
   scale:    [ 1, -1, 1 ],
 } as const
 
@@ -94,12 +94,22 @@ const send_camera = () => {
 
 sorter.onmessage = (e: MessageEvent<Ply_Sorter_Output>) => {
   draw_splats_num = e.data.count
-  gl.uniform1ui(gs.uniforms.splats_count, draw_splats_num)
+  if (!draw_splats_num) return
 
-  if (draw_splats_num) {
-    ord_buf.set(e.data.order)
-    const height = ceil(draw_splats_num / ord_txt.width)
-    subupload_texture(gl, ord_txt, 0, 0, ord_txt.width, height, ord_buf.subarray(0, height * ord_txt.width))
+  ord_buf.set(e.data.order)
+  const height = ceil(draw_splats_num / ord_txt.width)
+  subupload_texture(gl, ord_txt, 0, 0, ord_txt.width, height, ord_buf.subarray(0, height * ord_txt.width))
+
+  // flowing slots in the same back to front order
+  let k = 0
+  for (let i = 0; i < draw_splats_num; i++) {
+    const slot = slot_of[ord_buf[i]]
+    if (slot >= 0) flow_ord_buf[k++] = slot
+  }
+  flow_draw_num = k
+  if (k) {
+    const rows = ceil(k / flow_width)
+    subupload_texture(gl, flow_ord_txt, 0, 0, flow_width, rows, flow_ord_buf.subarray(0, rows * flow_width))
   }
 }
 
@@ -116,15 +126,18 @@ let pos_buf: Float32Array,
     rot_buf: Float32Array,
     scl_buf: Float32Array,
     col_buf: Float32Array,
-    ord_buf: Uint32Array,
-    stt_buf: Float32Array
+    ord_buf: Uint32Array
+
+const rgbaf32: Texture_Params = { internal_format: gl.RGBA32F }
+const rgbf32: Texture_Params  = { internal_format: gl.RGB32F }
+const r32ui: Texture_Params   = { internal_format: gl.R32UI }
 
 let total_splats_num = 0
 let loaded_splats_num = 0
 let draw_splats_num = 0
 
 load_ply(
-  "./assets/cliff.ply",
+  "./assets/loonie.ply",
   (header, count) => {
     total_splats_num = count
     console.log("HEADER", header)
@@ -139,15 +152,18 @@ load_ply(
     scl_buf = new Float32Array(txt_size3)
     col_buf = new Float32Array(txt_size4)
     ord_buf = new Uint32Array(texels_len)
-    stt_buf = new Float32Array(txt_size4)
 
-    const rgbaf32: Texture_Params = { internal_format: gl.RGBA32F }
-    const rgbf32: Texture_Params  = { internal_format: gl.RGB32F }
+    slot_of      = new Int32Array(count).fill(-1)
+    slot_ids     = new Uint32Array(texels_len)
+    flow_ord_buf = new Uint32Array(texels_len)
+    flow_width    = s.width
+    flow_max_rows = s.height
+
     pos_txt = new_texstore(gl, 0, s.width, s.height, rgbf32)
     rot_txt = new_texstore(gl, 1, s.width, s.height, rgbaf32)
     scl_txt = new_texstore(gl, 2, s.width, s.height, rgbf32)
     col_txt = new_texstore(gl, 3, s.width, s.height, rgbaf32)
-    ord_txt = new_texstore(gl, 4, s.width, s.height, { internal_format: gl.R32UI }, ord_buf)
+    ord_txt = new_texstore(gl, 4, s.width, s.height, r32ui, ord_buf)
 
     gl.uniform1i(gs.uniforms.position_map, pos_txt.id)
     gl.uniform1i(gs.uniforms.rotation_map, rot_txt.id)
@@ -158,21 +174,10 @@ load_ply(
     const header_message: Ply_Sorter_Input_Header = { type: "header", count }
     sorter.postMessage(header_message)
     send_camera()
-
-    // RGB32F is not color-renderable, so the state needs RGBA32F
-    noise_rt = new_feedback_render_target(gl, s.width, s.height, STATE_UNIT, rgbaf32)
-    gl.uniform1i(gs.uniforms.state_map, STATE_UNIT)
   },
   data => {
-    // state: origin position with t = -1, which marks it as just loaded
-    const state = new Float32Array(data.count * 4)
-    for (let i = 0; i < data.count; i++) {
-      state[i * 4]     = data.position[i * 3]
-      state[i * 4 + 1] = data.position[i * 3 + 1]
-      state[i * 4 + 2] = data.position[i * 3 + 2]
-      state[i * 4 + 3] = -1
-    }
-    append(noise_rt.read, stt_buf!, state, 4, data.offset, data.count)
+    // before data.position is handed over to the sorter
+    pick_flowing(data)
     append(pos_txt!, pos_buf!, data.position, 3, data.offset, data.count)
     append(rot_txt!, rot_buf!, data.rotation, 4, data.offset, data.count)
     append(scl_txt!, scl_buf!, data.scale,    3, data.offset, data.count)
@@ -213,12 +218,115 @@ const append = (
   subupload_texture(gl, txt, 0, yoffset, txt.width, sub_height, sub_data)
 }
 
+// uploads exactly [offset, offset + count) texels, unlike append it never rewrites texels around the range
+const upload_range = (
+  txt:    Texture,
+  data:   TypedArray,
+  stride: number,
+  offset: number,
+  count:  number,
+) => {
+  const w = txt.width
+  let i = 0
+  while (i < count) {
+    const x = (offset + i) % w
+    const y = (offset + i) / w | 0
+    // whole rows at once, a partial row on its own
+    const rows = x ? 0 : (count - i) / w | 0
+    const n = rows ? rows * w : min(count - i, w - x)
+    subupload_texture(gl, txt, x, y, rows ? w : n, rows || 1, data.subarray(i * stride, (i + n) * stride))
+    i += n
+  }
+}
+
 
 //////// NOISE
 ///////
 
-const STATE_UNIT = 5
-let noise_rt: Feedback_Render_Target
+const STATE_UNIT      = 5
+const FLOW_IDS_UNIT   = 6
+const FLOW_ORDER_UNIT = 7
+
+// only splats that pass the scale check get a slot, all flow textures share width and rows
+let noise_rt:     Feedback_Render_Target
+let flow_ids_txt: Texture
+let flow_ord_txt: Texture
+
+/** splat id -> slot, -1 for splats that do not flow */
+let slot_of:      Int32Array
+/** slot -> splat id */
+let slot_ids:     Uint32Array
+let flow_ord_buf: Uint32Array
+
+let flow_width     = 0
+let flow_rows      = 0
+let flow_max_rows  = 0
+let flow_slots_num = 0
+let flow_draw_num  = 0
+
+// grows flow textures by doubling rows, keeps the state of splats that already flow
+const ensure_flow_capacity = (count: number) => {
+  if (count <= flow_rows * flow_width) return
+
+  let rows = flow_rows || 16
+  while (rows * flow_width < count) rows *= 2
+  rows = min(rows, flow_max_rows)
+  const len = rows * flow_width
+
+  // RGB32F is not color-renderable, so the state needs RGBA32F
+  const rt  = new_feedback_render_target(gl, flow_width, rows, STATE_UNIT, rgbaf32)
+  const ids = new_texstore(gl, FLOW_IDS_UNIT, flow_width, rows, r32ui, slot_ids.subarray(0, len))
+  const ord = new_texstore(gl, FLOW_ORDER_UNIT, flow_width, rows, r32ui, flow_ord_buf.subarray(0, len))
+
+  if (flow_rows) {
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, noise_rt.read.fbo)
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, rt.read.fbo)
+    gl.blitFramebuffer(0, 0, flow_width, flow_rows, 0, 0, flow_width, flow_rows, gl.COLOR_BUFFER_BIT, gl.NEAREST)
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+
+    for (const target of [ noise_rt.read, noise_rt.write ]) {
+      gl.deleteFramebuffer(target.fbo)
+      gl.deleteTexture(target.txt)
+    }
+    gl.deleteTexture(flow_ids_txt.txt)
+    gl.deleteTexture(flow_ord_txt.txt)
+  }
+
+  noise_rt     = rt
+  flow_ids_txt = ids
+  flow_ord_txt = ord
+  flow_rows    = rows
+}
+
+// splats with the largest scale axis within flow.scale get the next slots
+const pick_flowing = (data: Ply_Parser_Output) => {
+  const state = new Float32Array(data.count * 4)
+  const ids   = new Uint32Array(data.count)
+  let n = 0
+
+  for (let i = 0; i < data.count; i++) {
+    const i3 = i * 3
+    const scale = max(data.scale[i3], data.scale[i3 + 1], data.scale[i3 + 2])
+    if (scale < flow.scale[0] || scale > flow.scale[1]) continue
+
+    const id = data.offset + i
+    slot_of[id] = flow_slots_num + n
+    ids[n] = id
+    // origin position with t = -1, which marks it as just loaded
+    state[n * 4]     = data.position[i3]
+    state[n * 4 + 1] = data.position[i3 + 1]
+    state[n * 4 + 2] = data.position[i3 + 2]
+    state[n * 4 + 3] = -1
+    n++
+  }
+  if (!n) return
+
+  ensure_flow_capacity(flow_slots_num + n)
+  slot_ids.set(ids.subarray(0, n), flow_slots_num)
+  upload_range(noise_rt.read, state, 4, flow_slots_num, n)
+  upload_range(flow_ids_txt, ids, 1, flow_slots_num, n)
+  flow_slots_num += n
+}
 
 // per splat values are picked between [ min, max ] by a hash of its id and seed
 const flow = {
@@ -229,14 +337,16 @@ const flow = {
   /** [ min, max ] multiplier of the curl velocity, the raw curl is not normalized, so tune by eye */
   speed:  [ 0.001, 0.01 ],
   /** [ min, max ] seconds a splat travels before it restarts from its origin */
-  limit:  [ 4.2, 7.8 ],
+  limit:  [ 2, 10 ],
+  /** [ min, max ] largest scale axis (model space) of a splat that flows, the rest only stay at origin */
+  scale:  [ 0.001, 0.01 ],
   /** noise frequency, higher gives smaller and tighter swirls */
   freq:   0.5,
   /** how fast the field itself changes over time (gradient rotation per second), 0 freezes it into fixed streamlines */
   evolve: 0.1,
 }
 
-const advect = new_quad_material<Flow_Uniform | "state_map" | "position_map" | "loaded_count" | "dt" | "flow_time" | "flow_freq" | "flow_evolve">(gl, advect_frag)
+const advect = new_quad_material<Flow_Uniform | "state_map" | "flow_id_map" | "position_map" | "flow_count" | "dt" | "flow_time" | "flow_freq" | "flow_evolve">(gl, advect_frag)
 
 const set_flow_uniforms = (m: Material<never, Flow_Uniform>) => {
   gl.useProgram(m.id)
@@ -252,20 +362,25 @@ gl.uniform1f(advect.uniforms.flow_freq, flow.freq)
 gl.uniform1f(advect.uniforms.flow_evolve, flow.evolve)
 gl.uniform1i(advect.uniforms.position_map, 0)
 gl.uniform1i(advect.uniforms.state_map, STATE_UNIT)
+gl.uniform1i(advect.uniforms.flow_id_map, FLOW_IDS_UNIT)
 
 // outside of frame() gs stays the current program, handlers set its uniforms
 gl.useProgram(gs.id)
+gl.uniform1i(gs.uniforms.state_map, STATE_UNIT)
+gl.uniform1i(gs.uniforms.flow_id_map, FLOW_IDS_UNIT)
+gl.uniform1i(gs.uniforms.flow_order_map, FLOW_ORDER_UNIT)
 
 const advect_step = (time: number, dt: number) => {
   gl.useProgram(advect.id)
   bind_quad_vao(gl)
-  gl.uniform1ui(advect.uniforms.loaded_count, loaded_splats_num)
+  gl.uniform1ui(advect.uniforms.flow_count, flow_slots_num)
   gl.uniform1f(advect.uniforms.dt, dt)
   gl.uniform1f(advect.uniforms.flow_time, time)
 
   use_texture(gl, noise_rt.read)
   gl.bindFramebuffer(gl.FRAMEBUFFER, noise_rt.write.fbo)
-  gl.viewport(0, 0, noise_rt.width, noise_rt.height)
+  // only rows with slots
+  gl.viewport(0, 0, flow_width, ceil(flow_slots_num / flow_width))
   render_quad(gl)
 
   swap_feedback_render_target(noise_rt)
@@ -287,21 +402,28 @@ const frame = (now: number) => {
 
   if (!loaded_splats_num) return
 
-  gl.disable(gl.BLEND)
-  advect_step(time, dt)
+  if (flow_slots_num) {
+    gl.disable(gl.BLEND)
+    advect_step(time, dt)
+  }
 
   gl.enable(gl.BLEND)
   gl.useProgram(gs.id)
   gl.bindVertexArray(vao)
-  use_texture(gl, noise_rt.read)
   gl.bindFramebuffer(gl.FRAMEBUFFER, null)
   gl.viewport(0, 0, camera.width, camera.height)
 
   // origins first, flowing splats blend over them
   gl.uniform1i(gs.uniforms.flowing, 0)
+  gl.uniform1ui(gs.uniforms.splats_count, draw_splats_num)
   gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, draw_splats_num)
-  gl.uniform1i(gs.uniforms.flowing, 1)
-  gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, draw_splats_num)
+
+  if (flow_draw_num) {
+    use_texture(gl, noise_rt.read)
+    gl.uniform1i(gs.uniforms.flowing, 1)
+    gl.uniform1ui(gs.uniforms.splats_count, flow_draw_num)
+    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, flow_draw_num)
+  }
 }
 
 requestAnimationFrame(frame)

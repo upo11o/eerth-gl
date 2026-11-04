@@ -3,11 +3,13 @@
 precision highp float;
 precision highp int;
 precision highp sampler2D;
+precision highp usampler2D;
 
 
 uniform sampler2D state_map;
+uniform usampler2D flow_id_map;
 uniform sampler2D position_map;
-uniform uint  loaded_count;
+uniform uint  flow_count;
 uniform float dt;
 uniform float flow_time;
 uniform float flow_freq;
@@ -23,17 +25,20 @@ void main(void) {
     ivec2 uv = ivec2(gl_FragCoord.xy);
     vec4 s = texelFetch(state_map, uv, 0);
 
-    uint id = uint(uv.y * textureSize(state_map, 0).x + uv.x);
-    if (id >= loaded_count) {
+    // the viewport covers whole rows, the tail of the last one is empty
+    uint slot = uint(uv.y * textureSize(state_map, 0).x + uv.x);
+    if (slot >= flow_count) {
         State = s;
         return;
     }
 
-    vec3 p0 = texelFetch(position_map, uv, 0).xyz;
+    uint id = texelFetch(flow_id_map, uv, 0).r;
+    uint w = uint(textureSize(position_map, 0).x);
+    vec3 p0 = texelFetch(position_map, ivec2(id % w, id / w), 0).xyz;
     Flow f = flow_params(id);
 
-    vec3 p = s.xyz;
-    float t = s.w;
+    vec3 p = s.xyz; // flow position
+    float t = s.w; // cycle phase t
 
     // first frame after load: start a cycle as a soft splat
     if (t < 0.0) {
