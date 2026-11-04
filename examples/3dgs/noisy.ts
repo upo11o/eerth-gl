@@ -1,9 +1,12 @@
-import { calc_texture_size, camera_set_perspective_projection, ceil, clamp, IOTA, mat4_compose_prs, mat4_mult, mat4_rot_gx, mat4_rot_ly, min, new_camera, new_mat4, new_material, new_texstore, subupload_texture, type Texture_Params, type Texture, new_feedback_render_target, Feedback_Render_Target } from "../../lib"
+import { bind_quad_vao, calc_texture_size, camera_set_perspective_projection, ceil, clamp, IOTA, mat4_compose_prs, mat4_mult, mat4_rot_gx, mat4_rot_ly, min, new_camera, new_feedback_render_target, new_mat4, new_material, new_quad_material, new_texstore, render_quad, subupload_texture, swap_feedback_render_target, use_texture, type Feedback_Render_Target, type Material, type Texture_Params, type Texture } from "../../lib"
 import { load_ply, type Ply_Sorter_Input_Camera, type Ply_Sorter_Input_Data, type Ply_Sorter_Input_Header, type Ply_Sorter_Output, sorter_worker } from "../../lib/gs"
 import { cprints, init_printer, new_worker } from "../../lib/helpers"
 
+import advect_src from "./advect.glsl"
+import flow_src from "./flow.glsl"
 import frag from "./frag.glsl"
-import vert from "./vert.glsl"
+import vert_src from "./noisy-vert.glsl"
+import psrdnoise_src from "./psrdnoise3.glsl"
 
 
 
@@ -15,10 +18,21 @@ const gl = canvas.getContext("webgl2", {
   antialias: false,
 })!
 
-gl.enable(gl.BLEND)
+// float state texture must be renderable
+if (!gl.getExtension("EXT_color_buffer_float")) {
+  throw new Error("EXT_color_buffer_float is not supported")
+}
+
 gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
 
 init_printer()
+
+const include = (src: string) => src
+  .replace("//#include psrdnoise", psrdnoise_src)
+  .replace("//#include flow", flow_src)
+
+const vert = include(vert_src)
+const advect_frag = include(advect_src)
 
 const camera = new_camera(0, 0, -3, 0, 0, 0, innerWidth, innerHeight, 0.1, 10, 1, 60)
 
@@ -29,7 +43,9 @@ const camera = new_camera(0, 0, -3, 0, 0, 0, innerWidth, innerHeight, 0.1, 10, 1
 const vao = gl.createVertexArray()
 gl.bindVertexArray(vao)
 
-const gs = new_material<never, "splats_count" | "viewport" | "matrix_model" | "matrix_view" | "matrix_projection" | "position_map" | "rotation_map" | "scale_map" | "color_map" | "order_map">(gl, vert, frag)!
+type Flow_Uniform = "flow_seed" | "flow_fade" | "flow_cycle" | "flow_speed" | "flow_limit"
+
+const gs = new_material<never, Flow_Uniform | "splats_count" | "viewport" | "matrix_model" | "matrix_view" | "matrix_projection" | "position_map" | "state_map" | "rotation_map" | "scale_map" | "color_map" | "order_map">(gl, vert, frag)!
 gl.useProgram(gs.id)
 
 gl.uniformMatrix4fv(gs.uniforms.matrix_view, false, camera.view)
@@ -37,7 +53,7 @@ gl.uniformMatrix4fv(gs.uniforms.matrix_view, false, camera.view)
 const model = new_mat4()
 
 const loonie_transform = {
-  position: [ 0, -0.5, 0 ],
+  position: [ 0, 0, 0 ],
   rotation: [ 0, 0, 0 ],
   scale:    [ 1, -1, 1 ],
 } as const
@@ -85,7 +101,6 @@ sorter.onmessage = (e: MessageEvent<Ply_Sorter_Output>) => {
     const height = ceil(draw_splats_num / ord_txt.width)
     subupload_texture(gl, ord_txt, 0, 0, ord_txt.width, height, ord_buf.subarray(0, height * ord_txt.width))
   }
-  request_draw()
 }
 
 
@@ -101,14 +116,15 @@ let pos_buf: Float32Array,
     rot_buf: Float32Array,
     scl_buf: Float32Array,
     col_buf: Float32Array,
-    ord_buf: Uint32Array
+    ord_buf: Uint32Array,
+    stt_buf: Float32Array
 
 let total_splats_num = 0
 let loaded_splats_num = 0
 let draw_splats_num = 0
 
 load_ply(
-  "./assets/cliff.ply",
+  "./assets/loonie.ply",
   (header, count) => {
     total_splats_num = count
     console.log("HEADER", header)
@@ -123,6 +139,7 @@ load_ply(
     scl_buf = new Float32Array(txt_size3)
     col_buf = new Float32Array(txt_size4)
     ord_buf = new Uint32Array(texels_len)
+    stt_buf = new Float32Array(txt_size4)
 
     const rgbaf32: Texture_Params = { internal_format: gl.RGBA32F }
     const rgbf32: Texture_Params  = { internal_format: gl.RGB32F }
@@ -142,10 +159,20 @@ load_ply(
     sorter.postMessage(header_message)
     send_camera()
 
-    noise_rt = new_feedback_render_target(gl, s.width, s.height, 5, rgbf32)
+    // RGB32F is not color-renderable, so the state needs RGBA32F
+    noise_rt = new_feedback_render_target(gl, s.width, s.height, STATE_UNIT, rgbaf32)
+    gl.uniform1i(gs.uniforms.state_map, STATE_UNIT)
   },
   data => {
-    append(noise_rt.read!, pos_buf!, data.position, 3, data.offset, data.count)
+    // state: origin position with t = -1, which marks it as just loaded
+    const state = new Float32Array(data.count * 4)
+    for (let i = 0; i < data.count; i++) {
+      state[i * 4]     = data.position[i * 3]
+      state[i * 4 + 1] = data.position[i * 3 + 1]
+      state[i * 4 + 2] = data.position[i * 3 + 2]
+      state[i * 4 + 3] = -1
+    }
+    append(noise_rt.read, stt_buf!, state, 4, data.offset, data.count)
     append(pos_txt!, pos_buf!, data.position, 3, data.offset, data.count)
     append(rot_txt!, rot_buf!, data.rotation, 4, data.offset, data.count)
     append(scl_txt!, scl_buf!, data.scale,    3, data.offset, data.count)
@@ -190,25 +217,84 @@ const append = (
 //////// NOISE
 ///////
 
+const STATE_UNIT = 5
 let noise_rt: Feedback_Render_Target
+
+const flow = {
+  seed:   1,
+  fade:   0.3,
+  cycle:  6,
+  speed:  [ 0.001, 0.01 ],
+  limit:  [ 0.05, 0.25 ],
+  freq:   1.5,
+  evolve: 0.3,
+}
+
+const advect = new_quad_material<Flow_Uniform | "state_map" | "position_map" | "loaded_count" | "dt" | "flow_time" | "flow_freq" | "flow_evolve">(gl, advect_frag)
+
+const set_flow_uniforms = (m: Material<never, Flow_Uniform>) => {
+  gl.useProgram(m.id)
+  gl.uniform1ui(m.uniforms.flow_seed, flow.seed)
+  gl.uniform1f(m.uniforms.flow_fade, flow.fade)
+  gl.uniform1f(m.uniforms.flow_cycle, flow.cycle)
+  gl.uniform2fv(m.uniforms.flow_speed, flow.speed)
+  gl.uniform2fv(m.uniforms.flow_limit, flow.limit)
+}
+
+set_flow_uniforms(gs)
+set_flow_uniforms(advect)
+gl.uniform1f(advect.uniforms.flow_freq, flow.freq)
+gl.uniform1f(advect.uniforms.flow_evolve, flow.evolve)
+gl.uniform1i(advect.uniforms.position_map, 0)
+gl.uniform1i(advect.uniforms.state_map, STATE_UNIT)
+
+// outside of frame() gs stays the current program, handlers set its uniforms
+gl.useProgram(gs.id)
+
+const advect_step = (time: number, dt: number) => {
+  gl.useProgram(advect.id)
+  bind_quad_vao(gl)
+  gl.uniform1ui(advect.uniforms.loaded_count, loaded_splats_num)
+  gl.uniform1f(advect.uniforms.dt, dt)
+  gl.uniform1f(advect.uniforms.flow_time, time)
+
+  use_texture(gl, noise_rt.read)
+  gl.bindFramebuffer(gl.FRAMEBUFFER, noise_rt.write.fbo)
+  gl.viewport(0, 0, noise_rt.width, noise_rt.height)
+  render_quad(gl)
+
+  swap_feedback_render_target(noise_rt)
+}
 
 
 //////// RENDER
 ///////
 
-let drawing = false
+let last_time = 0
 
-const draw = () => {
+const frame = (now: number) => {
+  requestAnimationFrame(frame)
+
+  const time = now / 1000
+  // clamp, so a background tab does not throw splats far away
+  const dt = min(time - last_time, 1 / 30)
+  last_time = time
+
+  if (!loaded_splats_num) return
+
+  gl.disable(gl.BLEND)
+  advect_step(time, dt)
+
+  gl.enable(gl.BLEND)
+  gl.useProgram(gs.id)
+  gl.bindVertexArray(vao)
+  use_texture(gl, noise_rt.read)
   gl.bindFramebuffer(gl.FRAMEBUFFER, null)
+  gl.viewport(0, 0, camera.width, camera.height)
   gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, draw_splats_num)
-  drawing = false
 }
 
-const request_draw = () => {
-  if (drawing) return
-  drawing = true
-  requestAnimationFrame(draw)
-}
+requestAnimationFrame(frame)
 
 
 //////// SIMPLE ORBIT CONTROL
@@ -243,7 +329,6 @@ onpointermove = (e) => {
   mat4_rot_gx(model, prev_polar - polar_angle)
   gl.uniformMatrix4fv(gs.uniforms.matrix_model, false, model)
   send_camera()
-  request_draw()
 }
 
 
@@ -260,7 +345,6 @@ const resize = () => {
   gl.uniform2f(gs.uniforms.viewport, camera.width, camera.height)
   gl.uniformMatrix4fv(gs.uniforms.matrix_projection, false, camera.proj)
   send_camera()
-  request_draw()
 }
 
 resize()
