@@ -1,4 +1,4 @@
-import { bind_quad_vao, calc_texture_size, camera_set_perspective_projection, ceil, clamp, IOTA, mat4_compose_prs, max, mat4_mult, mat4_rot_gx, mat4_rot_ly, min, new_camera, new_feedback_render_target, new_mat4, new_material, new_quad_material, new_texstore, render_quad, subupload_texture, swap_feedback_render_target, use_texture, type Feedback_Render_Target, type Material, type Texture_Params, type Texture } from "../../../lib"
+import { bind_quad_vao, calc_texture_size, camera_set_perspective_projection, ceil, clamp, IOTA, mat4_compose_prs, max, mat4_mult, mat4_rot_gx, mat4_rot_ly, min, new_camera, new_feedback_multiple_render_target, new_mat4, new_material, new_quad_material, new_texstore, render_quad, subupload_texture, swap_feedback_render_target, use_texture, type Feedback_Multiple_Render_Target, type Material, type Texture_Params, type Texture } from "../../../lib"
 import { load_ply, type Ply_Parser_Output, type Ply_Sorter_Input_Camera, type Ply_Sorter_Input_Data, type Ply_Sorter_Input_Header, type Ply_Sorter_Output, sorter_worker } from "../../../lib/gs"
 import { cprints, init_printer, new_worker } from "../../../lib/helpers"
 
@@ -13,6 +13,12 @@ import frag_src from "./frag.glsl"
 declare const canvas: HTMLCanvasElement
 canvas.style.imageRendering = "pixelated"
 
+canvas.style.position = "absolute"
+canvas.style.bottom = "0"
+canvas.style.left = "0"
+canvas.style.width = "800px"
+canvas.style.height = "800px"
+
 const gl = canvas.getContext("webgl2", {
   alpha:     false,
   antialias: false,
@@ -25,7 +31,7 @@ if (!gl.getExtension("EXT_color_buffer_float")) {
 
 gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
 
-init_printer()
+init_printer(null, "bottom:780px;top:auto")
 
 const include = (src: string) => src
   .replace("//#include psrdnoise", psrdnoise_src)
@@ -45,7 +51,7 @@ gl.bindVertexArray(vao)
 
 type Flow_Uniform = "flow_seed" | "flow_fade" | "flow_speed" | "flow_limit"
 
-const gs = new_material<never, Flow_Uniform | "splats_count" | "viewport" | "matrix_model" | "matrix_view" | "matrix_projection" | "position_map" | "state_map" | "flow_id_map" | "flow_order_map" | "flowing" | "light_dir" | "light_shininess" | "light_intensity" | "rotation_map" | "scale_map" | "color_map" | "order_map">(gl, vert, frag_src)!
+const gs = new_material<never, Flow_Uniform | "splats_count" | "viewport" | "matrix_model" | "matrix_view" | "matrix_projection" | "position_map" | "state_map" | "rotation_state_map" | "flow_id_map" | "flow_order_map" | "flowing" | "light_dir" | "light_shininess" | "light_intensity" | "rotation_map" | "scale_map" | "color_map" | "order_map">(gl, vert, frag_src)!
 gl.useProgram(gs.id)
 
 gl.uniformMatrix4fv(gs.uniforms.matrix_view, false, camera.view)
@@ -246,9 +252,14 @@ const upload_range = (
 const STATE_UNIT      = 5
 const FLOW_IDS_UNIT   = 6
 const FLOW_ORDER_UNIT = 7
+const ROTATION_UNIT   = 8
+
+type Flow_State = "state" | "rotation"
+// attachment order, matches the outputs of advect.glsl
+const FLOW_STATES: Flow_State[] = [ "state", "rotation" ]
 
 // only splats that pass the scale check get a slot, all flow textures share width and rows
-let noise_rt:     Feedback_Render_Target
+let noise_rt:     Feedback_Multiple_Render_Target<Flow_State>
 let flow_ids_txt: Texture
 let flow_ord_txt: Texture
 
@@ -274,19 +285,31 @@ const ensure_flow_capacity = (count: number) => {
   const len = rows * flow_width
 
   // RGB32F is not color-renderable, so the state needs RGBA32F
-  const rt  = new_feedback_render_target(gl, flow_width, rows, STATE_UNIT, rgbaf32)
+  const rt  = new_feedback_multiple_render_target(gl, flow_width, rows, {
+    state:    { id: STATE_UNIT,    params: rgbaf32 },
+    rotation: { id: ROTATION_UNIT, params: rgbaf32 },
+  })
   const ids = new_texstore(gl, FLOW_IDS_UNIT, flow_width, rows, r32ui, slot_ids.subarray(0, len))
   const ord = new_texstore(gl, FLOW_ORDER_UNIT, flow_width, rows, r32ui, flow_ord_buf.subarray(0, len))
 
   if (flow_rows) {
     gl.bindFramebuffer(gl.READ_FRAMEBUFFER, noise_rt.read.fbo)
     gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, rt.read.fbo)
-    gl.blitFramebuffer(0, 0, flow_width, flow_rows, 0, 0, flow_width, flow_rows, gl.COLOR_BUFFER_BIT, gl.NEAREST)
+    // blit writes into every draw buffer, so one attachment at a time
+    const none: number[] = FLOW_STATES.map(() => gl.NONE)
+    FLOW_STATES.forEach((_, i) => {
+      const draw = none.slice()
+      draw[i] = gl.COLOR_ATTACHMENT0 + i
+      gl.readBuffer(gl.COLOR_ATTACHMENT0 + i)
+      gl.drawBuffers(draw)
+      gl.blitFramebuffer(0, 0, flow_width, flow_rows, 0, 0, flow_width, flow_rows, gl.COLOR_BUFFER_BIT, gl.NEAREST)
+    })
+    gl.drawBuffers(FLOW_STATES.map((_, i) => gl.COLOR_ATTACHMENT0 + i))
     gl.bindFramebuffer(gl.FRAMEBUFFER, null)
 
     for (const target of [ noise_rt.read, noise_rt.write ]) {
       gl.deleteFramebuffer(target.fbo)
-      gl.deleteTexture(target.txt)
+      for (const name of FLOW_STATES) gl.deleteTexture(target.attach[name].txt)
     }
     gl.deleteTexture(flow_ids_txt.txt)
     gl.deleteTexture(flow_ord_txt.txt)
@@ -300,8 +323,9 @@ const ensure_flow_capacity = (count: number) => {
 
 // splats with the largest scale axis within flow.scale get the next slots
 const pick_flowing = (data: Ply_Parser_Output) => {
-  const state = new Float32Array(data.count * 4)
-  const ids   = new Uint32Array(data.count)
+  const state    = new Float32Array(data.count * 4)
+  const rotation = new Float32Array(data.count * 4)
+  const ids      = new Uint32Array(data.count)
   let n = 0
 
   for (let i = 0; i < data.count; i++) {
@@ -317,13 +341,15 @@ const pick_flowing = (data: Ply_Parser_Output) => {
     state[n * 4 + 1] = data.position[i3 + 1]
     state[n * 4 + 2] = data.position[i3 + 2]
     state[n * 4 + 3] = -1
+    rotation.set(data.rotation.subarray(i * 4, i * 4 + 4), n * 4)
     n++
   }
   if (!n) return
 
   ensure_flow_capacity(flow_slots_num + n)
   slot_ids.set(ids.subarray(0, n), flow_slots_num)
-  upload_range(noise_rt.read, state, 4, flow_slots_num, n)
+  upload_range(noise_rt.read.attach.state, state, 4, flow_slots_num, n)
+  upload_range(noise_rt.read.attach.rotation, rotation, 4, flow_slots_num, n)
   upload_range(flow_ids_txt, ids, 1, flow_slots_num, n)
   flow_slots_num += n
 }
@@ -337,16 +363,18 @@ const flow = {
   /** [ min, max ] multiplier of the curl velocity, the raw curl is not normalized, so tune by eye */
   speed:  [ 0.001, 0.01 ],
   /** [ min, max ] seconds a splat travels before it restarts from its origin */
-  limit:  [ 1, 5 ],
+  limit:  [ 1, 4 ],
   /** [ min, max ] largest scale axis (model space) of a splat that flows, the rest only stay at origin */
   scale:  [ 0.001, 0.01 ],
   /** noise frequency, higher gives smaller and tighter swirls */
   freq:   0.6,
   /** how fast the field itself changes over time (gradient rotation per second), 0 freezes it into fixed streamlines */
-  evolve: 0.1,
+  evolve: 0.2,
+  /** how fast a splat turns its longest axis along the flow, 1 / seconds, 0 keeps the loaded rotation */
+  turn:   4,
 }
 
-const advect = new_quad_material<Flow_Uniform | "state_map" | "flow_id_map" | "position_map" | "flow_count" | "dt" | "flow_time" | "flow_freq" | "flow_evolve">(gl, advect_frag)
+const advect = new_quad_material<Flow_Uniform | "state_map" | "rotation_state_map" | "flow_id_map" | "position_map" | "rotation_map" | "scale_map" | "flow_count" | "dt" | "flow_time" | "flow_freq" | "flow_evolve" | "flow_turn">(gl, advect_frag)
 
 const set_flow_uniforms = (m: Material<never, Flow_Uniform>) => {
   gl.useProgram(m.id)
@@ -360,13 +388,18 @@ set_flow_uniforms(gs)
 set_flow_uniforms(advect)
 gl.uniform1f(advect.uniforms.flow_freq, flow.freq)
 gl.uniform1f(advect.uniforms.flow_evolve, flow.evolve)
+gl.uniform1f(advect.uniforms.flow_turn, flow.turn)
 gl.uniform1i(advect.uniforms.position_map, 0)
+gl.uniform1i(advect.uniforms.rotation_map, 1)
+gl.uniform1i(advect.uniforms.scale_map, 2)
 gl.uniform1i(advect.uniforms.state_map, STATE_UNIT)
+gl.uniform1i(advect.uniforms.rotation_state_map, ROTATION_UNIT)
 gl.uniform1i(advect.uniforms.flow_id_map, FLOW_IDS_UNIT)
 
 // outside of frame() gs stays the current program, handlers set its uniforms
 gl.useProgram(gs.id)
 gl.uniform1i(gs.uniforms.state_map, STATE_UNIT)
+gl.uniform1i(gs.uniforms.rotation_state_map, ROTATION_UNIT)
 gl.uniform1i(gs.uniforms.flow_id_map, FLOW_IDS_UNIT)
 gl.uniform1i(gs.uniforms.flow_order_map, FLOW_ORDER_UNIT)
 
@@ -375,14 +408,19 @@ const light = {
   /** world space direction from a surface towards the light, normalized in the shader */
   dir:       [ 0, 1, -0.5 ],
   /** specular exponent, higher gives shorter, sharper blinks */
-  shininess: 128,
+  shininess: 16,
   /** brightness added at the peak of a blink */
-  intensity: 1,
+  intensity: 0,
 }
 
 gl.uniform3fv(gs.uniforms.light_dir, light.dir)
 gl.uniform1f(gs.uniforms.light_shininess, light.shininess)
 gl.uniform1f(gs.uniforms.light_intensity, light.intensity)
+
+const use_flow_state = () => {
+  for (const name of FLOW_STATES) use_texture(gl, noise_rt.read.attach[name])
+}
+
 const advect_step = (time: number, dt: number) => {
   gl.useProgram(advect.id)
   bind_quad_vao(gl)
@@ -390,7 +428,7 @@ const advect_step = (time: number, dt: number) => {
   gl.uniform1f(advect.uniforms.dt, dt)
   gl.uniform1f(advect.uniforms.flow_time, time)
 
-  use_texture(gl, noise_rt.read)
+  use_flow_state()
   gl.bindFramebuffer(gl.FRAMEBUFFER, noise_rt.write.fbo)
   // only rows with slots
   gl.viewport(0, 0, flow_width, ceil(flow_slots_num / flow_width))
@@ -432,7 +470,7 @@ const frame = (now: number) => {
   gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, draw_splats_num)
 
   if (flow_draw_num) {
-    use_texture(gl, noise_rt.read)
+    use_flow_state()
     gl.uniform1i(gs.uniforms.flowing, 1)
     gl.uniform1ui(gs.uniforms.splats_count, flow_draw_num)
     gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, flow_draw_num)

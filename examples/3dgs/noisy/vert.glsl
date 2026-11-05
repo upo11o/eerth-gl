@@ -10,6 +10,7 @@ uniform uint splats_count;
 
 uniform sampler2D position_map;
 uniform sampler2D state_map;
+uniform sampler2D rotation_state_map;   // flowing rotation, same slots as state_map
 uniform usampler2D flow_id_map;
 uniform usampler2D flow_order_map;  // flowing slots, back to front
 uniform bool flowing;   // false draws all splats at their origin unfaded, true draws flowing slots
@@ -109,8 +110,14 @@ mat3 quatToMat3(vec4 R) {
 
 
 
+// flowing splats turn along the flow, the rest keep the loaded rotation
+vec4 readRotation(in SplatSource source) {
+    return flowing ? texelFetch(rotation_state_map, source.slotUV, 0) : texelFetch(rotation_map, source.uv, 0);
+}
+
+
 void readCovariance(in SplatSource source, out vec3 covA, out vec3 covB) {
-    vec4 tR = texelFetch(rotation_map, source.uv, 0);
+    vec4 tR = readRotation(source);
     vec4 tS = texelFetch(scale_map, source.uv, 0);
 
     mat3 rot = quatToMat3(tR.wxyz);
@@ -227,7 +234,7 @@ void clipCorner(inout SplatCorner corner, float alpha) {
 
 // model space, the shortest axis of a flat splat is its normal
 vec3 readNormal(in SplatSource source) {
-    mat3 rot = quatToMat3(texelFetch(rotation_map, source.uv, 0).wxyz);
+    mat3 rot = quatToMat3(readRotation(source).wxyz);
     vec3 s = texelFetch(scale_map, source.uv, 0).xyz;
     return s.x < s.y ? (s.x < s.z ? rot[0] : rot[2]) : (s.y < s.z ? rot[1] : rot[2]);
 }
@@ -291,8 +298,8 @@ void main(void) {
     }
 
     // clipping trims the invisible gaussian tail, a solid quad keeps its full size
-    // clipCorner(corner, mix(color.w, 1.0, solid));
-    clipCorner(corner, color.w);
+    clipCorner(corner, mix(color.w, 1.0, solid));
+    // clipCorner(corner, color.w);
 
     gl_Position = center.proj + vec4(corner.offset, 0.0, 0.0);
     uv = corner.uv;
