@@ -6,6 +6,8 @@ precision highp sampler2D;
 precision highp usampler2D;
 
 
+//#define SPLAT_BATCH
+
 uniform uint splats_count;
 
 uniform sampler2D position_map;
@@ -59,7 +61,8 @@ struct SplatCorner {
 
 
 bool initSource(out SplatSource source) {
-    source.order = uint(gl_InstanceID);
+    // SPLAT_BATCH quads per instance, the last instance may run past the count
+    source.order = uint(gl_InstanceID) * SPLAT_BATCH + (uint(gl_VertexID) >> 2u);
     if (source.order >= splats_count) {
         return false;
     }
@@ -76,7 +79,7 @@ bool initSource(out SplatSource source) {
         source.id = texelFetch(order_map, orderUV, 0).r;
     }
     source.uv = ivec2(source.id % w, source.id / w);
-    source.cornerUV = vec2[](vec2(-1,-1), vec2(1,-1), vec2(-1,1), vec2(1,1))[gl_VertexID];
+    source.cornerUV = vec2[](vec2(-1,-1), vec2(1,-1), vec2(-1,1), vec2(1,1))[gl_VertexID & 3];
 
     return true;
 }

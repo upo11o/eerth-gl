@@ -37,7 +37,11 @@ const include = (src: string) => src
   .replace("//#include psrdnoise", psrdnoise_src)
   .replace("//#include flow", flow_src)
 
+// quads per instance, one small index buffer is drawn instanced over all splats
+const SPLAT_BATCH = 128
+
 const vert = include(vert_src)
+  .replace("//#define SPLAT_BATCH", `#define SPLAT_BATCH ${SPLAT_BATCH}u`)
 const advect_frag = include(advect_src)
 
 const camera = new_camera(0, 0, -3, 0, 0, 0, innerWidth, innerHeight, 0.1, 10, 1, 60)
@@ -48,6 +52,21 @@ const camera = new_camera(0, 0, -3, 0, 0, 0, innerWidth, innerHeight, 0.1, 10, 1
 
 const vao = gl.createVertexArray()
 gl.bindVertexArray(vao)
+
+// two triangles per quad, gl_VertexID is the index, so the shader gets quad = id >> 2 and corner = id & 3
+// shared corners repeat close together, so the post-transform cache shades ~4 vertices per quad, not 6
+const indices = new Uint16Array(SPLAT_BATCH * 6)
+for (let i = 0, v = 0; i < SPLAT_BATCH; i++, v += 4) {
+  indices.set([ v, v + 1, v + 2, v + 2, v + 1, v + 3 ], i * 6)
+}
+// element buffer binding is vao state
+gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, gl.createBuffer())
+gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW)
+
+const draw_splats = (count: number) => {
+  gl.uniform1ui(gs.uniforms.splats_count, count)
+  gl.drawElementsInstanced(gl.TRIANGLES, SPLAT_BATCH * 6, gl.UNSIGNED_SHORT, 0, ceil(count / SPLAT_BATCH))
+}
 
 type Flow_Uniform = "flow_seed" | "flow_fade" | "flow_speed" | "flow_limit"
 
@@ -466,14 +485,12 @@ const frame = (now: number) => {
 
   // origins first, flowing splats blend over them
   gl.uniform1i(gs.uniforms.flowing, 0)
-  gl.uniform1ui(gs.uniforms.splats_count, draw_splats_num)
-  gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, draw_splats_num)
+  draw_splats(draw_splats_num)
 
   if (flow_draw_num) {
     use_flow_state()
     gl.uniform1i(gs.uniforms.flowing, 1)
-    gl.uniform1ui(gs.uniforms.splats_count, flow_draw_num)
-    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, flow_draw_num)
+    draw_splats(flow_draw_num)
   }
 }
 
@@ -521,8 +538,10 @@ onpointermove = (e) => {
 const pr = min(2, devicePixelRatio)
 
 const resize = () => {
-  camera.width  = canvas.width  = innerWidth  * pr | 0
-  camera.height = canvas.height = innerHeight * pr | 0
+  camera.width  = canvas.width  = 800 * pr | 0
+  camera.height = canvas.height = 800 * pr | 0
+  // camera.width  = canvas.width  = innerWidth  * pr | 0
+  // camera.height = canvas.height = innerHeight * pr | 0
   camera_set_perspective_projection(camera)
   gl.viewport(0, 0, camera.width, camera.height)
   gl.uniform2f(gs.uniforms.viewport, camera.width, camera.height)
