@@ -1,4 +1,4 @@
-import { bind_quad_vao, calc_texture_size, camera_set_perspective_projection, ceil, clamp, IOTA, mat4_compose_prs, max, mat4_mult, mat4_rot_gx, mat4_rot_ly, min, new_camera, new_feedback_multiple_render_target, new_mat4, new_material, new_quad_material, new_texstore, render_quad, subupload_texture, swap_feedback_render_target, use_texture, type Feedback_Multiple_Render_Target, type Material, type Texture_Params, type Texture } from "../../../lib"
+import { bind_quad_vao, calc_texture_size, camera_set_perspective_projection, ceil, clamp, IOTA, mat4_compose_prs, max, mat4_mult, mat4_rot_gx, mat4_rot_ly, min, new_camera, new_feedback_multiple_render_target, new_mat4, new_material, new_quad_material, new_texstore, render_quad, subupload_texture, swap_feedback_render_target, use_texture, type Feedback_Multiple_Render_Target, type Material, type Texture_Params, type Texture, camera_update_mat, mat4_invert } from "../../../lib"
 import { load_ply, type Ply_Parser_Output, type Ply_Sorter_Input_Camera, type Ply_Sorter_Input_Data, type Ply_Sorter_Input_Header, type Ply_Sorter_Output, sorter_worker } from "../../../lib/gs"
 import { cprints, init_printer, new_worker } from "../../../lib/helpers"
 
@@ -44,7 +44,27 @@ const vert = include(vert_src)
   .replace("//#define SPLAT_BATCH", `#define SPLAT_BATCH ${SPLAT_BATCH}u`)
 const advect_frag = include(advect_src)
 
+
+//////// CAMERA
+///////
+
+const camera_moving = { x: 0, y: 0, z: 0 }
+
 const camera = new_camera(0, 0, -3, 0, 0, 0, innerWidth, innerHeight, 0.1, 10, 1, 60)
+addEventListener("keypress", e => {
+  if (e.key === "w") camera_moving.z = 1
+  else if (e.key === "s") camera_moving.z = -1
+  else if (e.key === "a") camera_moving.x = -1
+  else if (e.key === "d") camera_moving.x = 1
+  else if (e.key === "q") camera_moving.y = 1
+  else if (e.key === "e") camera_moving.y = -1
+})
+
+addEventListener("keyup", () => {
+  camera_moving.x =
+    camera_moving.y =
+      camera_moving.z = 0
+})
 
 
 //////// MESH
@@ -78,7 +98,7 @@ gl.uniformMatrix4fv(gs.uniforms.matrix_view, false, camera.view)
 const model = new_mat4()
 
 const loonie_transform = {
-  position: [ 0, 0, 0 ],
+  position: [ 0, -0.25, -2 ],
   rotation: [ 0, 0, 0 ],
   scale:    [ 1, -1, 1 ],
 } as const
@@ -162,7 +182,7 @@ let loaded_splats_num = 0
 let draw_splats_num = 0
 
 load_ply(
-  "./assets/loonie.ply",
+  "./assets/moon.ply",
   (header, count) => {
     total_splats_num = count
     console.log("HEADER", header)
@@ -376,15 +396,15 @@ const pick_flowing = (data: Ply_Parser_Output) => {
 // per splat values are picked between [ min, max ] by a hash of its id and seed
 const flow = {
   /** salt of the per splat hash and of the noise field, change it to reroll speed and limit of every splat and get another flow field */
-  seed:   5,
+  seed:   2,
   /** [ in, out ] each 0..0.5, share of the limit spent morphing from a gaussian splat into a solid quad after a restart, and fading alpha out before it, 0 means instant */
   fade:   [ 0.5, 0.5 ],
   /** [ min, max ] multiplier of the curl velocity, the raw curl is not normalized, so tune by eye */
-  speed:  [ 0.001, 0.01 ],
+  speed:  [ 0.002, 0.02 ],
   /** [ min, max ] seconds a splat travels before it restarts from its origin */
-  limit:  [ 1, 4 ],
+  limit:  [ 1, 7 ],
   /** [ min, max ] largest scale axis (model space) of a splat that flows, the rest only stay at origin */
-  scale:  [ 0.001, 0.01 ],
+  scale:  [ 0.005, 0.01 ],
   /** noise frequency, higher gives smaller and tighter swirls */
   freq:   0.6,
   /** how fast the field itself changes over time (gradient rotation per second), 0 freezes it into fixed streamlines */
@@ -429,7 +449,7 @@ const light = {
   /** specular exponent, higher gives shorter, sharper blinks */
   shininess: 16,
   /** brightness added at the peak of a blink */
-  intensity: 0,
+  intensity: 0.5,
 }
 
 gl.uniform3fv(gs.uniforms.light_dir, light.dir)
@@ -482,6 +502,15 @@ const frame = (now: number) => {
   gl.bindVertexArray(vao)
   gl.bindFramebuffer(gl.FRAMEBUFFER, null)
   gl.viewport(0, 0, camera.width, camera.height)
+
+  if (camera_moving.x || camera_moving.y || camera_moving.z) {
+    camera.pos[0] += camera_moving.x * dt
+    camera.pos[1] += camera_moving.y * dt
+    camera.pos[2] += camera_moving.z * dt
+    mat4_invert(camera.mat, camera.view)
+    gl.uniformMatrix4fv(gs.uniforms.matrix_view, false, camera.view)
+    send_camera()
+  }
 
   // origins first, flowing splats blend over them
   gl.uniform1i(gs.uniforms.flowing, 0)
