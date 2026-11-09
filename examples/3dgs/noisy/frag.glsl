@@ -10,7 +10,7 @@ out vec4 Color;
 
 void main(void) {
   float A = dot(uv, uv);
-  // gaussian falloff inside the unit circle, morphing to flat 1 over the whole quad
+  // gaussian falloff inside the unit circle for origins, flat 1 over the whole quad for flowing splats
   float G = A > 1.0 ? 0.0 : exp(-A * 4.0);
 
   A = mix(G, 1.0, solid) * color.a;

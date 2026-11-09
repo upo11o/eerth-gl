@@ -276,8 +276,8 @@ void main(void) {
     solid = 0.0;
     if (flowing) {
         Flow f = flow_params(source.id);
-        solid = flow_fade_in(f, state.w);
-        color.a *= flow_fade_out(f, state.w);
+        solid = 1.0;
+        color.a *= flow_fade_in(f, state.w) * flow_fade_out(f, state.w);
 
         // blinn-phong specular in view space, the model matrix is a rotation with flips, so it transforms normals as is
         vec3 n = normalize(mat3(center.modelView) * readNormal(source));
@@ -286,12 +286,12 @@ void main(void) {
         vec3 l = normalize(mat3(matrix_view) * light_dir);
         vec3 h = normalize(l - normalize(center.view));
         float spec = pow(max(dot(n, h), 0.0), light_shininess);
-        // added on top of the color, lit along with the morph, so a soft splat after a restart matches its origin
-        color.rgb += spec * light_intensity * solid;
+        // added on top of the color, fades along with alpha since the color is premultiplied in frag
+        color.rgb += spec * light_intensity;
     }
     if (color.a < 1.0 / 255.0) {
-      gl_Position = discardVec;
-      return;
+        gl_Position = discardVec;
+        return;
     }
 
     SplatCorner corner;

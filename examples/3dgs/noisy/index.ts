@@ -1,4 +1,4 @@
-import { bind_quad_vao, calc_texture_size, camera_set_perspective_projection, ceil, clamp, IOTA, mat4_compose_prs, max, mat4_mult, mat4_rot_gx, mat4_rot_ly, min, new_camera, new_feedback_multiple_render_target, new_mat4, new_material, new_quad_material, new_texstore, render_quad, subupload_texture, swap_feedback_render_target, use_texture, type Feedback_Multiple_Render_Target, type Material, type Texture_Params, type Texture, camera_update_mat, mat4_invert } from "../../../lib"
+import { bind_quad_vao, calc_texture_size, camera_set_perspective_projection, ceil, clamp, IOTA, mat4_compose_prs, max, mat4_mult, mat4_rot_gx, mat4_rot_ly, min, new_camera, new_feedback_multiple_render_target, new_mat4, new_material, new_quad_material, new_texstore, render_quad, subupload_texture, swap_feedback_render_target, use_texture, type Feedback_Multiple_Render_Target, type Material, type Texture_Params, type Texture, camera_update_mat, mat4_invert, sign } from "../../../lib"
 import { load_ply, type Ply_Parser_Output, type Ply_Sorter_Input_Camera, type Ply_Sorter_Input_Data, type Ply_Sorter_Input_Header, type Ply_Sorter_Output, sorter_worker } from "../../../lib/gs"
 import { cprints, init_printer, new_worker } from "../../../lib/helpers"
 
@@ -48,22 +48,28 @@ const advect_frag = include(advect_src)
 //////// CAMERA
 ///////
 
-const camera_moving = { x: 0, y: 0, z: 0 }
+const camera_move = { x: 0, y: 0, z: 0 }
 
-const camera = new_camera(0, 0, -3, 0, 0, 0, innerWidth, innerHeight, 0.1, 10, 1, 60)
+const camera = new_camera(0, 0, -3, 0, 0, 0, innerWidth, innerHeight, 0.1, 10, 1, 50)
+
 addEventListener("keypress", e => {
-  if (e.key === "w") camera_moving.z = 1
-  else if (e.key === "s") camera_moving.z = -1
-  else if (e.key === "a") camera_moving.x = -1
-  else if (e.key === "d") camera_moving.x = 1
-  else if (e.key === "q") camera_moving.y = 1
-  else if (e.key === "e") camera_moving.y = -1
+  const key = e.key.toLowerCase()
+  const vel = 1 + +e.shiftKey * 4
+  if (key === "a") camera_move.x = -vel
+  else if (key === "d") camera_move.x =  vel
+  else if (key === "q") camera_move.y = -vel
+  else if (key === "e") camera_move.y =  vel
+  else if (key === "s") camera_move.z = -vel
+  else if (key === "w") camera_move.z =  vel
 })
-
-addEventListener("keyup", () => {
-  camera_moving.x =
-    camera_moving.y =
-      camera_moving.z = 0
+addEventListener("keyup", e => {
+  const key = e.key.toLowerCase()
+  if (key === "a" && sign(camera_move.x) === -1) camera_move.x = 0
+  else if (key === "d" && sign(camera_move.x) ===  1) camera_move.x = 0
+  else if (key === "q" && sign(camera_move.y) === -1) camera_move.y = 0
+  else if (key === "e" && sign(camera_move.y) ===  1) camera_move.y = 0
+  else if (key === "s" && sign(camera_move.z) === -1) camera_move.z = 0
+  else if (key === "w" && sign(camera_move.z) ===  1) camera_move.z = 0
 })
 
 
@@ -98,7 +104,7 @@ gl.uniformMatrix4fv(gs.uniforms.matrix_view, false, camera.view)
 const model = new_mat4()
 
 const loonie_transform = {
-  position: [ 0, -0.25, -2 ],
+  position: [ 0, -0.1, -1.2 ],
   rotation: [ 0, 0, 0 ],
   scale:    [ 1, -1, 1 ],
 } as const
@@ -182,7 +188,7 @@ let loaded_splats_num = 0
 let draw_splats_num = 0
 
 load_ply(
-  "./assets/moon.ply",
+  "./assets/tree.ply",
   (header, count) => {
     total_splats_num = count
     console.log("HEADER", header)
@@ -369,8 +375,9 @@ const pick_flowing = (data: Ply_Parser_Output) => {
 
   for (let i = 0; i < data.count; i++) {
     const i3 = i * 3
+    const z = data.position[i3 + 2]
     const scale = max(data.scale[i3], data.scale[i3 + 1], data.scale[i3 + 2])
-    if (scale < flow.scale[0] || scale > flow.scale[1]) continue
+    if (z > 33 || scale < flow.scale[0] || scale > flow.scale[1] * max(1, z)) continue
 
     const id = data.offset + i
     slot_of[id] = flow_slots_num + n
@@ -397,20 +404,20 @@ const pick_flowing = (data: Ply_Parser_Output) => {
 const flow = {
   /** salt of the per splat hash and of the noise field, change it to reroll speed and limit of every splat and get another flow field */
   seed:   2,
-  /** [ in, out ] each 0..0.5, share of the limit spent morphing from a gaussian splat into a solid quad after a restart, and fading alpha out before it, 0 means instant */
+  /** [ in, out ] each 0..0.5, share of the limit spent fading alpha in after a restart, and fading it out before the next one, 0 means instant */
   fade:   [ 0.5, 0.5 ],
   /** [ min, max ] multiplier of the curl velocity, the raw curl is not normalized, so tune by eye */
-  speed:  [ 0.002, 0.02 ],
+  speed:  [ 0.005, 0.01 ],
   /** [ min, max ] seconds a splat travels before it restarts from its origin */
-  limit:  [ 1, 7 ],
+  limit:  [ 1, 5 ],
   /** [ min, max ] largest scale axis (model space) of a splat that flows, the rest only stay at origin */
-  scale:  [ 0.005, 0.01 ],
+  scale:  [ 0.001, 0.005 ],
   /** noise frequency, higher gives smaller and tighter swirls */
-  freq:   0.6,
+  freq:   0.9,
   /** how fast the field itself changes over time (gradient rotation per second), 0 freezes it into fixed streamlines */
   evolve: 0.2,
   /** how fast a splat turns its longest axis along the flow, 1 / seconds, 0 keeps the loaded rotation */
-  turn:   4,
+  turn:   10,
 }
 
 const advect = new_quad_material<Flow_Uniform | "state_map" | "rotation_state_map" | "flow_id_map" | "position_map" | "rotation_map" | "scale_map" | "flow_count" | "dt" | "flow_time" | "flow_freq" | "flow_evolve" | "flow_turn">(gl, advect_frag)
@@ -447,9 +454,9 @@ const light = {
   /** world space direction from a surface towards the light, normalized in the shader */
   dir:       [ 0, 1, -0.5 ],
   /** specular exponent, higher gives shorter, sharper blinks */
-  shininess: 16,
+  shininess: 32,
   /** brightness added at the peak of a blink */
-  intensity: 0.5,
+  intensity: 1,
 }
 
 gl.uniform3fv(gs.uniforms.light_dir, light.dir)
@@ -503,11 +510,16 @@ const frame = (now: number) => {
   gl.bindFramebuffer(gl.FRAMEBUFFER, null)
   gl.viewport(0, 0, camera.width, camera.height)
 
-  if (camera_moving.x || camera_moving.y || camera_moving.z) {
-    camera.pos[0] += camera_moving.x * dt
-    camera.pos[1] += camera_moving.y * dt
-    camera.pos[2] += camera_moving.z * dt
-    mat4_invert(camera.mat, camera.view)
+  if (camera_move.x || camera_move.y || camera_move.z) {
+    const dx = camera_move.x * dt
+    const dy = camera_move.y * dt
+    const dz = camera_move.z * dt
+    camera.pos[0] += dx
+    camera.pos[1] += dy
+    camera.pos[2] += dz
+    camera.view[12] -= dx
+    camera.view[13] -= dy
+    camera.view[14] -= dz
     gl.uniformMatrix4fv(gs.uniforms.matrix_view, false, camera.view)
     send_camera()
   }

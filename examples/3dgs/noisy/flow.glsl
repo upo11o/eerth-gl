@@ -45,10 +45,10 @@ vec2 flow_fade_time(Flow f) {
 
 // smoothstep is undefined for equal edges, so 0 fade time is handled apart
 
-// 0 -> 1 after a restart, morphs a gaussian splat into a solid quad
+// 0 -> 1 after a restart, alpha
 float flow_fade_in(Flow f, float t) {
     float F = flow_fade_time(f).x;
-    if (t < 0.0) return 0.0; // just loaded, soft
+    if (t < 0.0) return 0.0; // just loaded, hidden
     return F <= 0.0 ? 1.0 : smoothstep(0.0, F, t);
 }
 
