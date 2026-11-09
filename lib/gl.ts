@@ -933,7 +933,12 @@ export const new_shader = (
     return source
   }
 
-  const src = (source.startsWith("#version 300 es\n") ? "" : "#version 300 es\n") + source
+  let src = (source.startsWith("#version 300 es") ? "" : "#version 300 es\n") + source.trim()
+
+  // if fragment shader and float precision is not defined
+  if (type === 35632 && /precision \w+ float;/.test(src) === false) {
+    src = src.substring(0, 16) + "precision highp float;\n" + src.substring(16)
+  }
 
   const shader = gl.createShader(type)!
   gl.shaderSource(shader, src)
