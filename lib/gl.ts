@@ -741,7 +741,7 @@ export const new_feedback_render_target = (
 })
 
 
-export type Multiple_Render_Target<T extends string> = {
+export type Multiple_Render_Target<T extends string = string> = {
   fbo:    WebGLFramebuffer
   width:  number
   height: number
@@ -786,7 +786,7 @@ export const new_multiple_render_target = <T extends string>(
 }
 
 
-export type Feedback_Multiple_Render_Target<T extends string> = {
+export type Feedback_Multiple_Render_Target<T extends string = string> = {
   width:  number
   height: number
   read:   Multiple_Render_Target<T>
@@ -886,7 +886,7 @@ export const resize_feedback_multiple_render_target = <T extends string>(
 
 
 export const swap_feedback_render_target = (
-  rt: Feedback_Render_Target,
+  rt: Feedback_Render_Target | Feedback_Multiple_Render_Target,
 ): void => {
   const temp = rt.write
   rt.write = rt.read

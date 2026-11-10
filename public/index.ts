@@ -1,1 +1,1 @@
-import "../examples/3dgs"
+import "../examples/3dgs/noisy"
