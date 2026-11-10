@@ -104,7 +104,7 @@ gl.uniformMatrix4fv(gs.uniforms.matrix_view, false, camera.view)
 const model = new_mat4()
 
 const loonie_transform = {
-  position: [ 0, -0.1, -1.2 ],
+  position: [ 0, 0, -1.5 ],
   rotation: [ 0, 0, 0 ],
   scale:    [ 1, -1, 1 ],
 } as const
