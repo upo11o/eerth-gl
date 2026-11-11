@@ -1,6 +1,6 @@
 {
   "name": "eerth-gl",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "A tiny, dependency-free, and all-tree-shakeable TS wrapper over WebGL2 including essential graphics utilities. Keep zero overhead and full controll.",
   "keywords": [
     "webgl",
