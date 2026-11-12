@@ -1,4 +1,4 @@
-import { bind_quad_vao, calc_texture_size, camera_set_perspective_projection, ceil, clamp, IOTA, mat4_compose_prs, max, mat4_mult, mat4_rot_gx, mat4_rot_ly, min, new_camera, new_feedback_multiple_render_target, new_mat4, new_material, new_quad_material, new_texstore, render_quad, subupload_texture, swap_feedback_render_target, use_texture, type Feedback_Multiple_Render_Target, type Material, type Texture_Params, type Texture, camera_update_mat, mat4_invert, sign } from "../../../lib"
+import { bind_quad_vao, calc_texture_size, camera_set_perspective_projection, ceil, clamp, IOTA, mat4_compose_prs, max, mat4_mult, mat4_rot_gx, mat4_rot_ly, min, new_camera, new_feedback_multiple_render_target, new_mat4, new_material, new_quad_material, new_texstore, render_quad, subupload_texture, swap_feedback_render_target, use_texture, type Feedback_Multiple_Render_Target, type Material, type Texture_Params, type Texture, camera_update_mat, mat4_invert, sign, init_quad_vao } from "../../../lib"
 import { load_ply, type Ply_Parser_Output, type Ply_Sorter_Input_Camera, type Ply_Sorter_Input_Data, type Ply_Sorter_Input_Header, type Ply_Sorter_Output, sorter_worker } from "../../../lib/gs"
 import { cprints, init_printer, new_worker } from "../../../lib/helpers"
 
@@ -420,6 +420,7 @@ const flow = {
   turn:   10,
 }
 
+init_quad_vao(gl)
 const advect = new_quad_material<Flow_Uniform | "state_map" | "rotation_state_map" | "flow_id_map" | "position_map" | "rotation_map" | "scale_map" | "flow_count" | "dt" | "flow_time" | "flow_freq" | "flow_evolve" | "flow_turn">(gl, advect_frag)
 
 const set_flow_uniforms = (m: Material<never, Flow_Uniform>) => {
