@@ -1,6 +1,6 @@
-import { bind_quad_vao, calc_texture_size, camera_set_perspective_projection, ceil, clamp, IOTA, mat4_compose_prs, max, mat4_mult, mat4_rot_gx, mat4_rot_ly, min, new_camera, new_feedback_multiple_render_target, new_mat4, new_material, new_quad_material, new_texstore, render_quad, subupload_texture, swap_feedback_render_target, use_texture, type Feedback_Multiple_Render_Target, type Material, type Texture_Params, type Texture, camera_update_mat, mat4_invert, sign, init_quad_vao } from "../../../lib"
-import { load_ply, type Ply_Parser_Output, type Ply_Sorter_Input_Camera, type Ply_Sorter_Input_Data, type Ply_Sorter_Input_Header, type Ply_Sorter_Output, sorter_worker } from "../../../lib/gs"
-import { cprints, init_printer, new_worker } from "../../../lib/helpers"
+import { bind_quad_vao, calc_texture_size, camera_set_perspective_projection, ceil, clamp, IOTA, mat4_compose_prs, max, mat4_mult, mat4_rot_gx, mat4_rot_ly, min, new_camera, new_feedback_multiple_render_target, new_mat4, new_material, new_quad_material, new_texstore, render_quad, subupload_texture, swap_feedback_render_target, use_texture, type Feedback_Multiple_Render_Target, type Material, type Texture_Params, type Texture, sign, init_quad_vao } from "eerth-gl"
+import { load_ply, type Ply_Parser_Output, type Ply_Sorter_Input_Camera, type Ply_Sorter_Input_Data, type Ply_Sorter_Input_Header, type Ply_Sorter_Output, sorter_worker } from "eerth-gl/gs"
+import { cprints, init_printer, new_worker } from "eerth-gl/helpers"
 
 import psrdnoise_src from "./psrdnoise3.glsl"
 import flow_src from "./flow.glsl"

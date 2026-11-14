@@ -1,6 +1,6 @@
-import { calc_texture_size, camera_set_perspective_projection, ceil, clamp, IOTA, mat4_compose_prs, mat4_mult, mat4_rot_gx, mat4_rot_ly, min, new_camera, new_mat4, new_material, new_texstore, subupload_texture, type Texture_Params, type Texture } from "../../lib"
-import { load_ply, type Ply_Sorter_Input_Camera, type Ply_Sorter_Input_Data, type Ply_Sorter_Input_Header, type Ply_Sorter_Output, sorter_worker } from "../../lib/gs"
-import { cprints, init_printer, new_worker } from "../../lib/helpers"
+import { calc_texture_size, camera_set_perspective_projection, ceil, clamp, IOTA, mat4_compose_prs, mat4_mult, mat4_rot_gx, mat4_rot_ly, min, new_camera, new_mat4, new_material, new_texstore, subupload_texture, type Texture_Params, type Texture } from "eerth-gl"
+import { load_ply, type Ply_Sorter_Input_Camera, type Ply_Sorter_Input_Data, type Ply_Sorter_Input_Header, type Ply_Sorter_Output, sorter_worker } from "eerth-gl/gs"
+import { cprints, init_printer, new_worker } from "eerth-gl/helpers"
 
 import frag from "./frag.glsl"
 import vert from "./vert.glsl"

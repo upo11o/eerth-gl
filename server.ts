@@ -85,6 +85,9 @@ const ctx = await Esbuild.context({
   sourcemap: "linked",
 
   loader: { ".glsl": "text" },
+  alias:  {
+    "eerth-gl": "./lib",
+  },
 
   plugins: [ externalize, reload_on_build ],
 })

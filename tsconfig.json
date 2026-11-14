@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "lib": [ "ESNext", "DOM", "DOM.Iterable" ],
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "target": "ESNext",
     "module": "ESNext",
     "moduleDetection": "force",
@@ -11,8 +11,11 @@
     "skipLibCheck": true,
     "allowJs": true,
 
-    "paths": {},
-    "types": ["webxr"]
+    "paths": {
+      "eerth-gl": ["./lib"],
+      "eerth-gl/*": ["./lib/*"],
+    },
+    "types": ["webxr"],
   },
-  "include": [ "lib", "examples" ]
+  "include": ["lib", "examples"],
 }
