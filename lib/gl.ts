@@ -552,6 +552,7 @@ export type Texture_Params = Partial<{
 
   type:   number
   format: number
+  levels: number
 }>
 
 
@@ -565,6 +566,7 @@ const default_txt: Required<Texture_Params> = {
 
   type:   0,
   format: 0,
+  levels: 1,
 }
 
 
@@ -592,7 +594,8 @@ export const new_texstore = (
 
     internal_format = params.internal_format || default_txt.internal_format,
     type   = params.type   || texture_type_map[internal_format],
-    format = params.format || texture_format_map[internal_format]
+    format = params.format || texture_format_map[internal_format],
+    levels = params.levels || default_txt.levels
 
   const txt = gl.createTexture()!
   gl.activeTexture(gl.TEXTURE0 + id)
@@ -601,7 +604,7 @@ export const new_texstore = (
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, min_filter)
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap_s)
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap_t)
-  gl.texStorage2D(gl.TEXTURE_2D, 1, internal_format, width, height)
+  gl.texStorage2D(gl.TEXTURE_2D, levels, internal_format, width, height)
 
   if (data) {
     if (flip_y) {
