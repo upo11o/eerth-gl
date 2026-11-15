@@ -2,6 +2,20 @@ import { cos, IOTA, max, PI, sin, TAU } from "./math"
 import { new_vec3, vec3_clone, vec3_cross, vec3_lerp, vec3_mult_scalar, vec3_normalize, vec3_set, vec3_sub } from "./vec"
 
 
+export type Geometry = {
+  positions: Float32Array
+  normals?:  Float32Array
+  uvs?:      Float32Array
+  indices:   Uint16Array | Uint32Array
+}
+
+export type NonIndexedGeometry = {
+  positions: Float32Array
+  normals?:  Float32Array
+  uvs?:      Float32Array
+}
+
+
 const dummy3 = new_vec3()
 const a = new_vec3()
 const b = new_vec3()
@@ -13,6 +27,81 @@ export const cube_lines = new Float32Array([
   -1, -1, -1, -1, -1, 1, 1, -1, -1, 1, -1, 1, 1, 1, -1, 1, 1, 1, -1, 1, -1, -1, 1, 1,
   -1, -1, 1, 1, -1, 1, 1, -1, 1, 1, 1, 1, 1, 1, 1, -1, 1, 1, -1, 1, 1, -1, -1, 1,
 ])
+
+
+//////// SPHERE
+///////
+
+/** UV sphere centered at origin, CCW front faces in left-handed space.
+ * Seam and pole vertices are duplicated so uvs stay continuous
+ */
+export const get_sphere_uv_geometry = (
+  radius:          number = 1,
+  width_segments:  number = 32,
+  height_segments: number = 16,
+): Required<Geometry> => {
+  const ws = max(3, width_segments | 0)
+  const hs = max(2, height_segments | 0)
+
+  const vertex_count = (ws + 1) * (hs + 1)
+  const positions = new Float32Array(vertex_count * 3)
+  const normals   = new Float32Array(vertex_count * 3)
+  const uvs       = new Float32Array(vertex_count * 2)
+
+  let v = 0
+  for (let iy = 0; iy <= hs; iy++) {
+    const t = iy / hs
+    const phi = t * PI
+    const sp = sin(phi), cp = cos(phi)
+    // pole rows get their u shifted by half a segment so each pole triangle samples the middle of its column
+    const u_offset = iy === 0 ? 0.5 / ws : iy === hs ? -0.5 / ws : 0
+
+    for (let ix = 0; ix <= ws; ix++) {
+      const s = ix / ws
+      const theta = s * TAU
+      const nx = -cos(theta) * sp
+      const ny = cp
+      const nz = sin(theta) * sp
+
+      positions[v * 3]     = nx * radius
+      positions[v * 3 + 1] = ny * radius
+      positions[v * 3 + 2] = nz * radius
+      normals[v * 3]     = nx
+      normals[v * 3 + 1] = ny
+      normals[v * 3 + 2] = nz
+      uvs[v * 2]     = s + u_offset
+      uvs[v * 2 + 1] = 1 - t
+      v++
+    }
+  }
+
+  // pole rows contribute one triangle per segment instead of two
+  const index_count = ws * (hs - 1) * 6
+  const indices = vertex_count > 65535 ? new Uint32Array(index_count) : new Uint16Array(index_count)
+
+  let i = 0
+  const row = ws + 1
+  for (let iy = 0; iy < hs; iy++) {
+    for (let ix = 0; ix < ws; ix++) {
+      const a = iy * row + ix + 1
+      const b = iy * row + ix
+      const c = (iy + 1) * row + ix
+      const d = (iy + 1) * row + ix + 1
+      if (iy !== 0) {
+        indices[i++] = a
+        indices[i++] = d
+        indices[i++] = b
+      }
+      if (iy !== hs - 1) {
+        indices[i++] = b
+        indices[i++] = d
+        indices[i++] = c
+      }
+    }
+  }
+
+  return { positions, normals, uvs, indices }
+}
 
 
 export const get_ring_2d_lines = (
@@ -374,4 +463,48 @@ export const compute_normals = (position: Float32Array) => {
   }
 
   return normals
+}
+
+
+//////// WINDING
+///////
+
+/** Flips triangle winding in place by swapping 2nd and 3rd index of each triangle */
+export const flip_indices_winding = <T extends Uint16Array | Uint32Array>(indices: T): T => {
+  for (let i = 0; i + 2 < indices.length; i += 3) {
+    const t = indices[i + 1]
+    indices[i + 1] = indices[i + 2]
+    indices[i + 2] = t
+  }
+  return indices
+}
+
+/** Flips triangle winding in place for non-indexed data by swapping 2nd and 3rd vertex of each triangle.
+ * Normals are swapped along with positions, not negated
+ */
+export const flip_vertices_winding = <T extends NonIndexedGeometry>(data: T, vertex_count: number): T => {
+  const { positions, normals, uvs } = data
+  for (let v = 0; v + 2 < vertex_count; v += 3) {
+    swap_vertices(positions, 3, v)
+  }
+  if (normals) {
+    for (let v = 0; v + 2 < vertex_count; v += 3) {
+      swap_vertices(normals, 3, v)
+    }
+  }
+  if (uvs) {
+    for (let v = 0; v + 2 < vertex_count; v += 3) {
+      swap_vertices(uvs, 2, v)
+    }
+  }
+  return data
+}
+
+const swap_vertices = (arr: Float32Array, size: number, v: number): void => {
+  const ia = (v + 1) * size, ib = (v + 2) * size
+  for (let k = 0; k < size; k++) {
+    const t = arr[ia + k]
+    arr[ia + k] = arr[ib + k]
+    arr[ib + k] = t
+  }
 }
