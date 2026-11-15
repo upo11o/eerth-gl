@@ -144,25 +144,25 @@ const parse_material = (gltf: glTF, id: number): number[] => {
     if (key === "extensions") {
       for (const name in material.extensions) {
         const ext = material.extensions[name]
-        grap_images(gltf, ext, images)
+        grab_images(gltf, ext, images)
       }
       continue
     }
 
     if (key === "pbrMetallicRoughness") {
       const obj = material.pbrMetallicRoughness!
-      grap_images(gltf, obj, images)
+      grab_images(gltf, obj, images)
       continue
     }
 
-    grap_images(gltf, material, images)
+    grab_images(gltf, material, images)
   }
 
   return images
 }
 
 
-const grap_images = (
+const grab_images = (
   gltf: glTF,
   source: Record<string, { index: number }>,
   images: number[],
