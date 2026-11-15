@@ -119,17 +119,28 @@ export const vec2_reflect = (v: NumberArray, n: NumberArray, t = v): void => {
 }
 
 
-export const vec2_length = (v: NumberArray): number => {
+export const vec2_length2 = (v: NumberArray): number => {
   const x = v[0], y = v[1]
-  return sqrt(x * x + y * y)
+  return x * x + y * y
+}
+export const vec3_length2 = (v: NumberArray): number => {
+  const x = v[0], y = v[1], z = v[2]
+  return x * x + y * y + z * z
+}
+export const vec4_length2 = (v: NumberArray): number => {
+  const x = v[0], y = v[1], z = v[2], w = v[3]
+  return x * x + y * y + z * z + w * w
+}
+
+
+export const vec2_length = (v: NumberArray): number => {
+  return sqrt(vec2_length2(v))
 }
 export const vec3_length = (v: NumberArray): number => {
-  const x = v[0], y = v[1], z = v[2]
-  return sqrt(x * x + y * y + z * z)
+  return sqrt(vec3_length2(v))
 }
 export const vec4_length = (v: NumberArray): number => {
-  const x = v[0], y = v[1], z = v[2], w = v[3]
-  return sqrt(x * x + y * y + z * z + w * w)
+  return sqrt(vec4_length2(v))
 }
 
 
