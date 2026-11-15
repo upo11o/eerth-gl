@@ -1,3 +1,5 @@
+type Nullish = null | undefined
+type Primitive = string | number | boolean
 type HTMLTag = keyof HTMLElementTagNameMap
 
 type Attributes =

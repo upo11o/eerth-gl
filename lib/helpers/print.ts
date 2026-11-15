@@ -14,7 +14,7 @@ default style:
 ```
 */
 export const init_printer = (
-  container?: HTMLElement | Nullish,
+  container?: HTMLElement | null,
   style?: string,
 ) => {
   printer = document.createElement("pre")
