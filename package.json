@@ -20,6 +20,7 @@
   "files": [
     "./lib"
   ],
+  "types": "./lib/types.d.ts",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/upo11o/eerth-gl.git"

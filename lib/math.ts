@@ -119,9 +119,12 @@ export const cosine_sample_hemiball_z = (u1: number, u2: number, u3: number, out
  * Assumes z >= 0 is the polar axis. Works for both surface (|x,y,z|=1) and
  * interior points (preserves radial distance).
  */
-export const to_cosine_distributed = (x: number, y: number, z: number, out: NumberArray) => {
+export const to_cosine_distributed = (x: number, y: number, z: number, out: NumberArray): void => {
   let r = x * x + y * y + z * z
-  if (r === 0) return { x: 0, y: 0, z: 0 }
+  if (r === 0) {
+    out[0] = out[1] = out[2] = 0
+    return
+  }
 
   // Normalize to unit direction
   r = sqrt(r)

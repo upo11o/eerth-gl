@@ -8,9 +8,8 @@ export const new_quad_material = <U extends string>(
   gl: WebGL2RenderingContext,
   frag: string | WebGLShader,
 ): Material<never, U> => {
-  if (!vert) vert = new_shader(gl, 35633,
-    /*glsl*/"in vec2 p;out vec2 vuv;void main(){vuv=p*.5+.5;gl_Position=vec4(p,0,1);}",
-  )!
+  vert ||= new_shader(gl, 35633, /*glsl*/"in vec2 p;out vec2 vuv;void main(){vuv=p*.5+.5;gl_Position=vec4(p,0,1);}")!
+  init_quad_vao(gl)
   return new_material<never, U>(gl, vert, frag)!
 }
 
