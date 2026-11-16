@@ -1,4 +1,4 @@
-import { bind_render_target, type Material, Render_Target, Texture } from "../gl"
+import { bind_render_target, type Material, type Render_Target, type Texture } from "../gl"
 import { bind_quad_vao, new_quad_material, render_quad } from "../quad"
 
 
