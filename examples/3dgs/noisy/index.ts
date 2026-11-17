@@ -371,23 +371,44 @@ const pick_flowing = (data: Ply_Parser_Output) => {
   const state    = new Float32Array(data.count * 4)
   const rotation = new Float32Array(data.count * 4)
   const ids      = new Uint32Array(data.count)
+
+  const splat_scale = data.scale
+  const splat_color = data.color
+  const splat_pos = data.position
+  const splat_rot = data.rotation
+
+  const offset = data.offset
+  const count = data.count
   let n = 0
 
-  for (let i = 0; i < data.count; i++) {
-    const i3 = i * 3
-    const z = data.position[i3 + 2]
-    const scale = max(data.scale[i3], data.scale[i3 + 1], data.scale[i3 + 2])
-    if (z > 33 || scale < flow.scale[0] || scale > flow.scale[1] * max(1, z)) continue
 
-    const id = data.offset + i
+  for (let i = 0; i < count; i++) {
+    const i3 = i * 3
+    const i4 = i * 4
+    // filter out by color (by blue component)
+    const b = splat_color[i4 + 2]
+    // filter out by depth
+    const z = splat_pos[i3 + 2]
+    // filter out by longest scale
+    const splat_max_scale = max(splat_scale[i3], splat_scale[i3 + 1], splat_scale[i3 + 2])
+    if (
+         z > 33
+      || splat_max_scale < flow.scale[0]
+      || splat_max_scale > flow.scale[1] * max(1, z)
+      || b > splat_color[i4] && b > splat_color[i4 + 1]
+    ) {
+      continue
+    }
+
+    const id = offset + i
     slot_of[id] = flow_slots_num + n
     ids[n] = id
     // origin position with t = -1, which marks it as just loaded
-    state[n * 4]     = data.position[i3]
-    state[n * 4 + 1] = data.position[i3 + 1]
-    state[n * 4 + 2] = data.position[i3 + 2]
+    state[n * 4]     = splat_pos[i3]
+    state[n * 4 + 1] = splat_pos[i3 + 1]
+    state[n * 4 + 2] = z
     state[n * 4 + 3] = -1
-    rotation.set(data.rotation.subarray(i * 4, i * 4 + 4), n * 4)
+    rotation.set(splat_rot.subarray(i * 4, i * 4 + 4), n * 4)
     n++
   }
   if (!n) return
@@ -457,7 +478,7 @@ const light = {
   /** specular exponent, higher gives shorter, sharper blinks */
   shininess: 32,
   /** brightness added at the peak of a blink */
-  intensity: 1,
+  intensity: 0.62,
 }
 
 gl.uniform3fv(gs.uniforms.light_dir, light.dir)
