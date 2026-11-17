@@ -47,9 +47,9 @@ export const new_camera_orbit = (
 
   el.addEventListener("pointermove", e => {
     if (e.pointerId !== pid) return
-    const dx = e.clientX - px
-    const dy = e.clientY - py
-    camera_orbit_update(orbit, -dx * 0.003, dy * 0.003)
+    const dx = (e.clientX - px) * 0.003
+    const dy = (e.clientY - py) * 0.003
+    camera_orbit_update(orbit, -dx, dy)
     px = e.clientX
     py = e.clientY
   })
