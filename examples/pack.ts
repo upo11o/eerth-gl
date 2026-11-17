@@ -1,4 +1,4 @@
-import { bind_ubo, bind_vertex_data, clamp, cube_lines, draw_axis, get_icosahedron, IOTA, mat4_rot_gx, mat4_rot_ly, mat4_scl, mat4_set_orthographic_projection, new_axis, new_mat4, new_material, new_shader, new_ubo, SQRT1_3, tris_to_lines, update_ubo } from "eerth-gl"
+import { bind_ubo, bind_vertex_data, cube_lines, draw_axis, get_icosahedron, mat4_scl, mat4_set_orthographic_projection, new_axis, new_mat4, new_material, new_model_orbit, new_shader, new_ubo, SQRT1_3, tris_to_lines, update_ubo } from "eerth-gl"
 import { cprints, init_printer, new_worker, prints } from "eerth-gl/helpers"
 
 
@@ -34,6 +34,11 @@ const enum UBO_OFFSET {
 const world = new_mat4()
 mat4_scl(world, SQRT1_3)
 update_ubo(gl, ubo, UBO_OFFSET.world, world)
+
+new_model_orbit(world, canvas, () => {
+  update_ubo(gl, ubo, UBO_OFFSET.world, world)
+  request_draw()
+})
 
 const proj = new_mat4()
 
@@ -103,7 +108,7 @@ const instance_dummy = new Float32Array(4)
 worker.onmessage = e => {
   if (e.data.done) {
     const pack_time = (performance.now() - pack_start_time) * 0.001
-    prints("\ndone in", `${pack_time.toFixed(3)}s`)
+    prints("\npacked in", `${pack_time.toFixed(3)}s`)
     worker.terminate()
     worker = null!
     return
@@ -172,42 +177,6 @@ const draw = () => {
 }
 
 request_draw()
-
-
-//////// SIMPLE ORBIT CONTROL
-///////
-
-const p = { x: 0, y: 0, up: true }
-
-onpointerdown = (e) => {
-  p.x = e.clientX
-  p.y = e.clientY
-  p.up = false
-}
-
-onpointercancel = onpointerup = () => {
-  p.up = true
-}
-
-// accumulates dy to check polar overstep
-let polar_angle = 0
-
-onpointermove = (e) => {
-  if (p.up) return
-
-  const dx = (e.clientX - p.x) * 0.005
-  const dy = (e.clientY - p.y) * 0.005
-  p.x = e.clientX
-  p.y = e.clientY
-
-  mat4_rot_ly(world, -dx)
-  const prev_polar = polar_angle
-  polar_angle = clamp(polar_angle - dy, -IOTA, IOTA)
-  mat4_rot_gx(world, polar_angle - prev_polar)
-  update_ubo(gl, ubo, UBO_OFFSET.world, world)
-
-  request_draw()
-}
 
 
 //////// RESIZE HANDLER
