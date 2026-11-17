@@ -417,7 +417,7 @@ const push_vertex = (vertex: NumberArray, buffer: number[]): void => {
 }
 
 
-export const tris_to_lines = <T extends number[] | TypedArray>(
+export const tris_to_lines = <T extends NumberArray>(
   buf: T,
   vlen: number,
 ): T => {
