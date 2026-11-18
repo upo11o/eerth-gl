@@ -260,6 +260,13 @@ export const vec3_rot_y = (v: NumberArray, a: number, t = v): void => {
   t[2] = c * z - s * x
 }
 
+/** rotate vec as [0,0,1] to [±1,0,0] */
+export const vec3_turn_zx = (v: NumberArray, sign: 1 | -1, t = v): void => {
+  t[0] = sign * v[2]
+  t[1] = v[1]
+  t[2] = -sign * v[0]
+}
+
 /** rotates `v` by angle `a` around unit `axis` */
 export const vec3_axis_rot = (v: NumberArray, a: number, axis: NumberArray, t = v): void => {
   const c = cos(a), s = sin(a)
