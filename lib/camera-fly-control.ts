@@ -1,6 +1,7 @@
 import { camera_update_mat, type Camera } from "./camera"
 import { new_vec3 } from "./vec"
 import { new_camera_orbit, type Camera_Orbit } from "./camera-orbit-control"
+import { qweasd_clear_event, qweasd_down_event, qweasd_shift_event, qweasd_up_event } from "./ui/qweasd"
 
 
 
@@ -31,9 +32,13 @@ export const new_camera_fly = (
   let vel = 1
 
   const update_move = () => {
-    move[0] = (+held.has("KeyD") - +held.has("KeyA")) * vel
-    move[1] = (+held.has("KeyE") - +held.has("KeyQ")) * vel
-    move[2] = (+held.has("KeyW") - +held.has("KeyS")) * vel * hand
+    move[0] = (+held.has("D") - +held.has("A")) * vel
+    move[1] = (+held.has("E") - +held.has("Q")) * vel
+    move[2] = (+held.has("W") - +held.has("S")) * vel * hand
+  }
+
+  const update_vel = (force: boolean) => {
+    vel = 1 + +force * 4
   }
 
   const clear_move = () => {
@@ -48,16 +53,30 @@ export const new_camera_fly = (
       clear_move()
       return
     }
-    held.add(e.code)
-    vel = 1 + +e.shiftKey * 4
+    held.add(e.code[3])
+    update_vel(e.shiftKey)
     update_move()
   })
   addEventListener("keyup", e => {
-    held.delete(e.code)
-    vel = 1 + +e.shiftKey * 4
+    held.delete(e.code[3])
     update_move()
   })
   addEventListener("blur", clear_move)
+
+  // QWEASD UI listeners
+  addEventListener(qweasd_down_event, (e: CustomEvent<string>) => {
+    held.add(e.detail)
+    update_move()
+  })
+  addEventListener(qweasd_up_event, (e: CustomEvent<string>) => {
+    held.delete(e.detail)
+    update_move()
+  })
+  addEventListener(qweasd_shift_event, (e: CustomEvent<boolean>) => {
+    update_vel(e.detail)
+    update_move()
+  })
+  addEventListener(qweasd_clear_event, clear_move)
 
   const fly: Camera_Fly = {
     move,

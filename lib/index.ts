@@ -1,5 +1,6 @@
 export * from "./axis"
 export * from "./camera"
+export * from "./camera-fly-control"
 export * from "./camera-orbit-control"
 export * from "./ease"
 export * from "./geometry"

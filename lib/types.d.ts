@@ -71,3 +71,10 @@ interface Array<T> {
 }
 
 declare function parseInt(string: any, radix?: number | undefined): number
+
+interface CustomListener {
+  (evt: CustomEvent): void
+}
+
+declare function addEventListener<K extends keyof WindowEventMap>(type: K, listener: (this: Window, ev: WindowEventMap[K]) => any, options?: boolean | AddEventListenerOptions): void;
+declare function addEventListener(type: string, listener: EventListenerOrEventListenerObject | CustomListener, options?: boolean | AddEventListenerOptions): void;

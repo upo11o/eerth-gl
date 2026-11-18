@@ -1,15 +1,15 @@
 type Nullish = null | undefined
 type Primitive = string | number | boolean
-type HTMLTag = keyof HTMLElementTagNameMap
+export type HTMLTag = keyof HTMLElementTagNameMap
 
-type Attributes =
+export type Attributes =
 | Nullish
 | { [key: string]: Record<string, string> | Function | Primitive | Nullish }
 & { style?: Record<string, string> | string }
 
 type Child = Element | Primitive | Nullish | Child[]
 
-type Element<T extends HTMLTag | Nullish = undefined> =
+export type Element<T extends HTMLTag | Nullish = undefined> =
   T extends HTMLTag ? HTMLElementTagNameMap[T] :
   T extends null    ? DocumentFragment :
                       HTMLElement
@@ -21,9 +21,6 @@ const is_nullish = (value: unknown): value is Nullish => (
 const primitive_types = [ "string", "number", "boolean" ]
 const is_primitive = (value: unknown): value is Primitive => (
   primitive_types.includes(typeof value)
-)
-const is_function = (value: unknown): value is Function => (
-  value instanceof Function
 )
 
 
@@ -38,39 +35,6 @@ export const h = <T extends HTMLTag | Nullish = null>(
   traverse_attributes(node, attributes)
   traverse_children(node, children)
   return node as Element<T>
-}
-
-
-export const new_ui_pool = <T extends keyof HTMLElementTagNameMap>(
-  tag: T,
-  capacity: number,
-  attributes?: Attributes,
-) => {
-  type Pool_Item = HTMLElementTagNameMap[T]
-  const new_el = () => h(tag, attributes) as Pool_Item
-
-  const list: Pool_Item[] = Array(capacity)
-  for (let i = 0; i < capacity; i++) {
-    list[i] = new_el()
-  }
-
-  return {
-    get() {
-      if (list.length === 0) {
-        list.length = capacity
-        for (let i = 0; i < capacity; i++) {
-          list[i] = new_el()
-        }
-      }
-      return list.pop()!
-    },
-    put(el: Pool_Item) {
-      list.push(el)
-    },
-    clear() {
-      list.length = 0
-    },
-  }
 }
 
 
@@ -89,7 +53,7 @@ const traverse_attributes = (node: HTMLElement | DocumentFragment, attributes?: 
     else if (is_primitive(value)) {
       node.setAttribute(key, `${value}`)
     }
-    else if (is_function(value)) {
+    else if (value instanceof Function) {
       // @ts-ignore
       node[key] = value
     }

@@ -17,6 +17,7 @@ export const init_printer = (
   container?: HTMLElement | null,
   style?: string,
 ) => {
+  if (printer) return
   printer = document.createElement("pre")
   printer.setAttribute("style", "position:absolute;top:0;left:0;font-family:monospace;font-size:16px;line-height:20px")
   if (style) {

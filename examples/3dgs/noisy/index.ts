@@ -1,24 +1,24 @@
-import { bind_quad_vao, calc_texture_size, camera_set_perspective_projection, ceil, mat4_compose_prs, max, mat4_mult, min, new_camera, new_feedback_multiple_render_target, new_mat4, new_material, new_quad_material, new_texstore, render_quad, subupload_texture, swap_feedback_render_target, use_texture, type Feedback_Multiple_Render_Target, type Material, type Texture_Params, type Texture, init_quad_vao } from "eerth-gl"
+import { bind_quad_vao, calc_texture_size, camera_set_perspective_projection, ceil, mat4_compose_prs, max, mat4_mult, min, new_camera, new_feedback_multiple_render_target, new_mat4, new_material, new_quad_material, new_texstore, render_quad, subupload_texture, swap_feedback_render_target, use_texture, type Feedback_Multiple_Render_Target, type Material, type Texture_Params, type Texture, init_quad_vao, update_camera_fly, new_camera_fly } from "eerth-gl"
 import { load_ply, type Ply_Parser_Output, type Ply_Sorter_Input_Camera, type Ply_Sorter_Input_Data, type Ply_Sorter_Input_Header, type Ply_Sorter_Output, sorter_worker } from "eerth-gl/gs"
-import { cprints, init_printer, new_worker } from "eerth-gl/helpers"
+import { cprints, init_printer, init_qweasd } from "eerth-gl/ui"
+import { new_worker } from "eerth-gl/helpers"
 
 import psrdnoise_src from "./psrdnoise3.glsl"
 import flow_src from "./flow.glsl"
 import advect_src from "./advect.glsl"
 import vert_src from "./vert.glsl"
 import frag_src from "./frag.glsl"
-import { new_camera_fly, update_camera_fly } from "eerth-gl/camera-fly-control"
 
 
 
 declare const canvas: HTMLCanvasElement
 canvas.style.imageRendering = "pixelated"
 
-// canvas.style.position = "absolute"
-// canvas.style.bottom = "0"
-// canvas.style.left = "0"
-// canvas.style.width = "800px"
-// canvas.style.height = "800px"
+canvas.style.position = "absolute"
+canvas.style.bottom = "0"
+canvas.style.left = "0"
+canvas.style.width = "800px"
+canvas.style.height = "800px"
 
 const gl = canvas.getContext("webgl2", {
   alpha:     false,
@@ -33,6 +33,8 @@ if (!gl.getExtension("EXT_color_buffer_float")) {
 gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
 
 init_printer()
+
+init_qweasd()
 
 const include = (src: string) => src
   .replace("//#include psrdnoise", psrdnoise_src)
@@ -533,10 +535,10 @@ requestAnimationFrame(frame)
 const pr = min(2, devicePixelRatio)
 
 const resize = () => {
-  // camera.width  = canvas.width  = 800 * pr | 0
-  // camera.height = canvas.height = 800 * pr | 0
-  camera.width  = canvas.width  = innerWidth  * pr | 0
-  camera.height = canvas.height = innerHeight * pr | 0
+  camera.width  = canvas.width  = 800 * pr | 0
+  camera.height = canvas.height = 800 * pr | 0
+  // camera.width  = canvas.width  = innerWidth  * pr | 0
+  // camera.height = canvas.height = innerHeight * pr | 0
   camera_set_perspective_projection(camera)
   gl.viewport(0, 0, camera.width, camera.height)
   gl.uniform2f(gs.uniforms.viewport, camera.width, camera.height)

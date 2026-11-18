@@ -1,5 +1,6 @@
 import { bind_ubo, bind_vertex_data, cube_lines, draw_axis, get_icosahedron, mat4_scl, mat4_set_orthographic_projection, new_axis, new_mat4, new_material, new_model_orbit, new_shader, new_ubo, SQRT1_3, tris_to_lines, update_ubo } from "eerth-gl"
-import { cprints, init_printer, new_worker, prints } from "eerth-gl/helpers"
+import { cprints, init_printer, prints } from "eerth-gl/ui"
+import { new_worker } from "eerth-gl/helpers"
 
 
 declare const canvas: HTMLCanvasElement
