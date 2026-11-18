@@ -47,30 +47,13 @@ export const new_blur_pass = (
 ) => {
   const sample_len = ((kernel_size - 1) / 4 | 0) + 1
 
-  const blur = new_quad_material<"map" | "weight" | "offset" | "dir">(gl, /*glsl*/`
-    precision highp float;
-    uniform sampler2D map;
-    uniform float[${sample_len}] weight;
-    uniform float[${sample_len}] offset;
-    uniform vec2 dir;
-    in vec2 vuv;
-    out vec4 Color;
-    void main() {
-      vec2 ts = 1.0 / vec2(textureSize(map, 0));
-      vec4 img = texture(map, vuv) * weight[0];
-      for (int i = 1; i < ${sample_len}; i++) {
-        img += texture(map, vuv + dir * ts * offset[i]) * weight[i];
-        img += texture(map, vuv - dir * ts * offset[i]) * weight[i];
-      }
-      Color = img;
-    }`,
-  )
+  const blur = new_quad_material<"m" | "w" | "o" | "d">(gl, /*glsl*/`#define u uniform\nu sampler2D m;u float[${sample_len}] w;u float[${sample_len}] o;u vec2 d;in vec2 vuv;out vec4 O;void main(){vec2 s=1./vec2(textureSize(m,0));vec4 v=texture(m,vuv)*w[0];for(int i=1;i<${sample_len};i++){v+=texture(m,vuv+d*s*o[i])*w[i];v+=texture(m,vuv-d*s*o[i])*w[i];}O=v;}`)
 
   gl.useProgram(blur.id)
 
   const kernel = get_blur_kernel(kernel_size)
-  gl.uniform1fv(blur.uniforms.weight, kernel.weight)
-  gl.uniform1fv(blur.uniforms.offset, kernel.offset)
+  gl.uniform1fv(blur.uniforms.w, kernel.weight)
+  gl.uniform1fv(blur.uniforms.o, kernel.offset)
 
   return blur
 }
@@ -91,7 +74,7 @@ export const apply_blur_pass = (
   for (let i = 0; i < repeat; i++) {
     for (let d = 0; d < 2; d++) {
       bind_render_target(gl, target.write)
-      gl.uniform2fv(material.uniforms.dir, dir[d])
+      gl.uniform2fv(material.uniforms.d, dir[d])
       gl.bindTexture(gl.TEXTURE_2D, target.read.txt)
       render_quad(gl)
       swap_feedback_render_target(target)
