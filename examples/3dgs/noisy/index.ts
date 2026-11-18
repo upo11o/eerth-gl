@@ -1,4 +1,4 @@
-import { bind_quad_vao, calc_texture_size, camera_set_perspective_projection, ceil, clamp, IOTA, mat4_compose_prs, max, mat4_mult, mat4_rot_gx, mat4_rot_ly, min, new_camera, new_feedback_multiple_render_target, new_mat4, new_material, new_quad_material, new_texstore, render_quad, subupload_texture, swap_feedback_render_target, use_texture, type Feedback_Multiple_Render_Target, type Material, type Texture_Params, type Texture, sign, init_quad_vao } from "eerth-gl"
+import { bind_quad_vao, calc_texture_size, camera_set_perspective_projection, ceil, mat4_compose_prs, max, mat4_mult, min, new_camera, new_feedback_multiple_render_target, new_mat4, new_material, new_quad_material, new_texstore, render_quad, subupload_texture, swap_feedback_render_target, use_texture, type Feedback_Multiple_Render_Target, type Material, type Texture_Params, type Texture, init_quad_vao } from "eerth-gl"
 import { load_ply, type Ply_Parser_Output, type Ply_Sorter_Input_Camera, type Ply_Sorter_Input_Data, type Ply_Sorter_Input_Header, type Ply_Sorter_Output, sorter_worker } from "eerth-gl/gs"
 import { cprints, init_printer, new_worker } from "eerth-gl/helpers"
 
@@ -7,17 +7,18 @@ import flow_src from "./flow.glsl"
 import advect_src from "./advect.glsl"
 import vert_src from "./vert.glsl"
 import frag_src from "./frag.glsl"
+import { new_camera_fly, update_camera_fly } from "eerth-gl/camera-fly-control"
 
 
 
 declare const canvas: HTMLCanvasElement
 canvas.style.imageRendering = "pixelated"
 
-canvas.style.position = "absolute"
-canvas.style.bottom = "0"
-canvas.style.left = "0"
-canvas.style.width = "800px"
-canvas.style.height = "800px"
+// canvas.style.position = "absolute"
+// canvas.style.bottom = "0"
+// canvas.style.left = "0"
+// canvas.style.width = "800px"
+// canvas.style.height = "800px"
 
 const gl = canvas.getContext("webgl2", {
   alpha:     false,
@@ -31,7 +32,7 @@ if (!gl.getExtension("EXT_color_buffer_float")) {
 
 gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
 
-init_printer(null, "bottom:780px;top:auto")
+init_printer()
 
 const include = (src: string) => src
   .replace("//#include psrdnoise", psrdnoise_src)
@@ -45,32 +46,7 @@ const vert = include(vert_src)
 const advect_frag = include(advect_src)
 
 
-//////// CAMERA
-///////
-
-const camera_move = { x: 0, y: 0, z: 0 }
-
 const camera = new_camera(0, 0, -3, 0, 0, 0, innerWidth, innerHeight, 0.1, 10, 1, 50)
-
-addEventListener("keypress", e => {
-  const key = e.key.toLowerCase()
-  const vel = 1 + +e.shiftKey * 4
-  if (key === "a") camera_move.x = -vel
-  else if (key === "d") camera_move.x =  vel
-  else if (key === "q") camera_move.y = -vel
-  else if (key === "e") camera_move.y =  vel
-  else if (key === "s") camera_move.z = -vel
-  else if (key === "w") camera_move.z =  vel
-})
-addEventListener("keyup", e => {
-  const key = e.key.toLowerCase()
-  if (key === "a" && sign(camera_move.x) === -1) camera_move.x = 0
-  else if (key === "d" && sign(camera_move.x) ===  1) camera_move.x = 0
-  else if (key === "q" && sign(camera_move.y) === -1) camera_move.y = 0
-  else if (key === "e" && sign(camera_move.y) ===  1) camera_move.y = 0
-  else if (key === "s" && sign(camera_move.z) === -1) camera_move.z = 0
-  else if (key === "w" && sign(camera_move.z) ===  1) camera_move.z = 0
-})
 
 
 //////// MESH
@@ -428,7 +404,7 @@ const flow = {
   /** [ in, out ] each 0..0.5, share of the limit spent fading alpha in after a restart, and fading it out before the next one, 0 means instant */
   fade:   [ 0.5, 0.5 ],
   /** [ min, max ] multiplier of the curl velocity, the raw curl is not normalized, so tune by eye */
-  speed:  [ 0.005, 0.01 ],
+  speed:  [ 0.001, 0.005 ],
   /** [ min, max ] seconds a splat travels before it restarts from its origin */
   limit:  [ 1, 5 ],
   /** [ min, max ] largest scale axis (model space) of a splat that flows, the rest only stay at origin */
@@ -511,6 +487,8 @@ const advect_step = (time: number, dt: number) => {
 
 let last_time = 0
 
+const fly = new_camera_fly(camera, canvas, send_camera)
+
 const frame = (now: number) => {
   requestAnimationFrame(frame)
 
@@ -532,19 +510,8 @@ const frame = (now: number) => {
   gl.bindFramebuffer(gl.FRAMEBUFFER, null)
   gl.viewport(0, 0, camera.width, camera.height)
 
-  if (camera_move.x || camera_move.y || camera_move.z) {
-    const dx = camera_move.x * dt
-    const dy = camera_move.y * dt
-    const dz = camera_move.z * dt
-    camera.pos[0] += dx
-    camera.pos[1] += dy
-    camera.pos[2] += dz
-    camera.view[12] -= dx
-    camera.view[13] -= dy
-    camera.view[14] -= dz
-    gl.uniformMatrix4fv(gs.uniforms.matrix_view, false, camera.view)
-    send_camera()
-  }
+  update_camera_fly(fly, dt)
+  gl.uniformMatrix4fv(gs.uniforms.matrix_view, false, camera.view)
 
   // origins first, flowing splats blend over them
   gl.uniform1i(gs.uniforms.flowing, 0)
@@ -560,51 +527,16 @@ const frame = (now: number) => {
 requestAnimationFrame(frame)
 
 
-//////// SIMPLE ORBIT CONTROL
-///////
-
-const p = { x: 0, y: 0, up: true }
-
-onpointerdown = (e) => {
-  p.x = e.clientX
-  p.y = e.clientY
-  p.up = false
-}
-
-onpointercancel = onpointerup = () => {
-  p.up = true
-}
-
-// accumulates dy to check polar overstep
-let polar_angle = 0
-
-onpointermove = (e) => {
-  if (p.up) return
-
-  const dx = (e.clientX - p.x) * 0.005
-  const dy = (p.y - e.clientY) * 0.005
-  p.x = e.clientX
-  p.y = e.clientY
-
-  mat4_rot_ly(model, -dx)
-  const prev_polar = polar_angle
-  polar_angle = clamp(polar_angle - dy, -IOTA, IOTA)
-  mat4_rot_gx(model, prev_polar - polar_angle)
-  gl.uniformMatrix4fv(gs.uniforms.matrix_model, false, model)
-  send_camera()
-}
-
-
 //////// RESIZE
 ///////
 
 const pr = min(2, devicePixelRatio)
 
 const resize = () => {
-  camera.width  = canvas.width  = 800 * pr | 0
-  camera.height = canvas.height = 800 * pr | 0
-  // camera.width  = canvas.width  = innerWidth  * pr | 0
-  // camera.height = canvas.height = innerHeight * pr | 0
+  // camera.width  = canvas.width  = 800 * pr | 0
+  // camera.height = canvas.height = 800 * pr | 0
+  camera.width  = canvas.width  = innerWidth  * pr | 0
+  camera.height = canvas.height = innerHeight * pr | 0
   camera_set_perspective_projection(camera)
   gl.viewport(0, 0, camera.width, camera.height)
   gl.uniform2f(gs.uniforms.viewport, camera.width, camera.height)
