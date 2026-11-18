@@ -6,14 +6,18 @@ import { new_vec3, vec3_set } from "./vec"
 
 
 
-type Camera_Orbit = {
+export type Camera_Orbit = {
+  /** spherical position representaion (polar, azimut, radius) */
   spherical:  Float32Array
+  /** cartesian position representaion (X, Y, Z) */
   cartesian:  Float32Array
+  /** camera controled by the orbit */
   camera:     Camera
   min_polar:  number
   max_polar:  number
   min_radius: number
   max_radius: number
+  /** callback fired after orbit updates camera */
   on_update:  () => void
 }
 
@@ -49,7 +53,7 @@ export const new_camera_orbit = (
     if (e.pointerId !== pid) return
     const dx = (e.clientX - px) * 0.003
     const dy = (e.clientY - py) * 0.003
-    camera_orbit_update(orbit, -dx, dy)
+    orbit_update_camera(orbit, -dx, dy)
     px = e.clientX
     py = e.clientY
   })
@@ -95,7 +99,7 @@ export const new_camera_orbit = (
 }
 
 
-export const camera_orbit_update = (orbit: Camera_Orbit, dx: number, dy: number): void => {
+export const orbit_update_camera = (orbit: Camera_Orbit, dx: number, dy: number): void => {
   const spherical = orbit.spherical
   spherical[0] -= dy
   spherical[0]  = clamp(spherical[0], orbit.min_polar, orbit.max_polar)
