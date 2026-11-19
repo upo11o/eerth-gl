@@ -2,23 +2,13 @@ import { bind_render_target, type Material, type Render_Target, type Texture } f
 import { bind_quad_vao, new_quad_material, render_quad } from "../quad"
 
 
-export type Contrast_Pass_Material = Material<never, "map" | "amount">
+export type Contrast_Pass_Material = Material<never, "m" | "a">
 
 export const new_contrast_pass = (
   gl: WebGL2RenderingContext,
   premultiplied = false,
 ): Contrast_Pass_Material => {
-  return new_quad_material(gl, /*glsl*/`
-    precision highp float;
-    uniform sampler2D map;
-    uniform float amount;
-    in vec2 vuv;
-    out vec4 Color;
-    void main() {
-      vec4 c = texture(map, vuv);
-      Color = vec4(((c.rgb - 0.5) * amount + 0.5) * ${premultiplied ? "c.a" : "1.0"}, c.a);
-    }`,
-  )
+  return new_quad_material(gl, /*glsl*/`uniform sampler2D m;uniform float a;in vec2 vuv;out vec4 O;void main(){vec4 c=texture(m,vuv);O=vec4(((c.rgb-.5)*a+.5)*${premultiplied ? "c.a" : "1."},c.a);}`)
 }
 
 export const apply_contrast_pass = (
@@ -36,7 +26,7 @@ export const apply_contrast_pass = (
 
   bind_quad_vao(gl)
   gl.useProgram(material.id)
-  gl.uniform1f(material.uniforms.amount, amount)
+  gl.uniform1f(material.uniforms.a, amount)
   render_quad(gl)
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, null)
