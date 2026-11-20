@@ -1,4 +1,5 @@
 export * from "./h"
+export * from "./loader"
 export * from "./pool"
 export * from "./print"
 export * from "./qweasd"
