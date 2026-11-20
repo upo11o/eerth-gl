@@ -32,9 +32,9 @@ export const new_camera_fly = (
   let vel = 1
 
   const update_move = () => {
-    move[0] = (+held.has("D") - +held.has("A")) * vel
-    move[1] = (+held.has("E") - +held.has("Q")) * vel
-    move[2] = (+held.has("W") - +held.has("S")) * vel * hand
+    move[0] = (+(held.has("KeyD") || held.has("ArrowRight")) - +(held.has("KeyA") || held.has("ArrowLeft"))) * vel
+    move[1] = (+held.has("KeyE") - +held.has("KeyQ")) * vel
+    move[2] = (+(held.has("KeyW") || held.has("ArrowUp")) - +(held.has("KeyS") || held.has("ArrowDown"))) * vel * hand
   }
 
   const update_vel = (force: boolean) => {
@@ -53,12 +53,12 @@ export const new_camera_fly = (
       clear_move()
       return
     }
-    held.add(e.code[3])
+    held.add(e.code)
     update_vel(e.shiftKey)
     update_move()
   })
   addEventListener("keyup", e => {
-    held.delete(e.code[3])
+    held.delete(e.code)
     update_move()
   })
   addEventListener("blur", clear_move)

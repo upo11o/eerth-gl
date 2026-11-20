@@ -8,19 +8,19 @@ export const qweasd_clear_event = "eerth-qweasd-clear"
 
 const new_ev = <T extends string | boolean>(type: string, detail?: T) => new CustomEvent(type, { detail })
 
-const a_down = new_ev(qweasd_down_event, "A")
-const d_down = new_ev(qweasd_down_event, "D")
-const q_down = new_ev(qweasd_down_event, "Q")
-const e_down = new_ev(qweasd_down_event, "E")
-const s_down = new_ev(qweasd_down_event, "S")
-const w_down = new_ev(qweasd_down_event, "W")
+const a_down = new_ev(qweasd_down_event, "KeyA")
+const d_down = new_ev(qweasd_down_event, "KeyD")
+const q_down = new_ev(qweasd_down_event, "KeyQ")
+const e_down = new_ev(qweasd_down_event, "KeyE")
+const s_down = new_ev(qweasd_down_event, "KeyS")
+const w_down = new_ev(qweasd_down_event, "KeyW")
 
-const a_up = new_ev(qweasd_up_event, "A")
-const d_up = new_ev(qweasd_up_event, "D")
-const q_up = new_ev(qweasd_up_event, "Q")
-const e_up = new_ev(qweasd_up_event, "E")
-const s_up = new_ev(qweasd_up_event, "S")
-const w_up = new_ev(qweasd_up_event, "W")
+const a_up = new_ev(qweasd_up_event, "KeyA")
+const d_up = new_ev(qweasd_up_event, "KeyD")
+const q_up = new_ev(qweasd_up_event, "KeyQ")
+const e_up = new_ev(qweasd_up_event, "KeyE")
+const s_up = new_ev(qweasd_up_event, "KeyS")
+const w_up = new_ev(qweasd_up_event, "KeyW")
 
 const shift_down = new_ev(qweasd_shift_event, true)
 const shift_up   = new_ev(qweasd_shift_event, false)
@@ -60,39 +60,37 @@ export const init_qweasd = (
 
   const qweasd = h("div", { class: "eerth-qweasd-wrap", style })
 
-  const check = h("span", { style: "color:#0000" }, "●")
+  const check = h("span", { style: "color:#3b3;visibility:hidden" }, "🔥")
   const shift = h("div", {
     onpointerdown: (e: PointerEvent) => {
       if (e.button !== 0) return
-      if (shift.style.background) {
+      if (check.style.visibility === "visible") {
         dispatchEvent(shift_up)
-        shift.style.removeProperty("background")
-        check.style.color = "#0000"
+        check.style.visibility = "hidden"
       } else {
         dispatchEvent(shift_down)
-        shift.style.background = "#fff4"
-        check.style.color = "#3b3"
+        check.style.visibility = "visible"
       }
     },
     class: "eerth-qweasd-char",
-    style: "width:112px",
+    style: "width:96px",
   }, "shift ", check)
 
   qweasd.append(
-    h("div", { style: "width:112px" }),
-    new_char_btn("Q", "↓", "#3b3", q_down, q_up),
-    new_char_btn("W", "↑", "#55f", w_down, w_up),
-    new_char_btn("E", "↑", "#3b3", e_down, e_up),
+    h("div", { style: "width:72px" }),
+    new_char_btn("Q", "↓", "#3a3", q_down, q_up),
+    new_char_btn("W", "↑", "#57f", w_down, w_up),
+    new_char_btn("E", "↑", "#3a3", e_down, e_up),
     shift,
-    new_char_btn("A", "←", "#f33", a_down, a_up),
-    new_char_btn("S", "↓", "#55f", s_down, s_up),
-    new_char_btn("D", "→", "#f33", d_down, d_up),
+    new_char_btn("A", "←", "#e53", a_down, a_up),
+    new_char_btn("S", "↓", "#57f", s_down, s_up),
+    new_char_btn("D", "→", "#e53", d_down, d_up),
   )
 
   if (!qweasd_style_sheet) {
     qweasd_style_sheet = new CSSStyleSheet()
-    qweasd_style_sheet.insertRule(".eerth-qweasd-wrap{position:absolute;bottom:0;right:0;margin:8px;width:328px;display:flex;flex-wrap:wrap;gap:8px}")
-    qweasd_style_sheet.insertRule(".eerth-qweasd-char{width:64px;height:64px;padding:8px;border:2px solid #fff;border-radius:8px;font:bold 16px/16px sans-serif;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;box-sizing:border-box;& span{font:24px/16px monospace}}")
+    qweasd_style_sheet.insertRule(".eerth-qweasd-wrap{position:absolute;bottom:0;right:0;margin:8px;width:312px;display:flex;flex-wrap:wrap;gap:8px}")
+    qweasd_style_sheet.insertRule(".eerth-qweasd-char{width:64px;height:64px;padding:8px;font:bold 1rem/1rem sans-serif;border:1px solid #fff7;box-shadow:1px 1px 4px #0007;backdrop-filter:blur(8px);border-radius:8px;box-sizing:border-box;user-select:none;touch-action:none;-webkit-user-select:none;-webkit-touch-callout:none;& span{font:1.5rem/1rem monospace}}")
     document.adoptedStyleSheets.push(qweasd_style_sheet)
   }
 
