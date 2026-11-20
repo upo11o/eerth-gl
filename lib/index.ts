@@ -1,3 +1,4 @@
+export * from "./animate"
 export * from "./axis"
 export * from "./blue-noise"
 export * from "./camera"
