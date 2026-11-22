@@ -30,7 +30,7 @@ export const h = <T extends HTMLTag | Nullish = null>(
   type?: T,
   attributes?: Attributes,
   ...children: Child[]
-) => {
+): Element<T> => {
   const node = type ? document.createElement(type) : new DocumentFragment()
   traverse_attributes(node, attributes)
   traverse_children(node, children)
@@ -90,7 +90,7 @@ const traverse_children = (
 
 //////// MOUNT OBSERVER
 
-export const onmount = (node: Node, fn: Function) => {
+export const onmount = (node: Node, fn: Function): void => {
   let subs = mount_set.get(node)
   if (subs === undefined) {
     mount_set.set(node, subs = new Set)
@@ -98,14 +98,14 @@ export const onmount = (node: Node, fn: Function) => {
   subs.add(fn)
 }
 
-export const offmount = (node: Node, fn: Function) => {
+export const offmount = (node: Node, fn: Function): void => {
   const subs = mount_set.get(node)
   if (subs) {
     subs.delete(fn)
   }
 }
 
-export const onunmount = (node: Node, fn: Function) => {
+export const onunmount = (node: Node, fn: Function): void => {
   let subs = unmount_set.get(node)
   if (subs === undefined) {
     unmount_set.set(node, subs = new Set)
@@ -113,7 +113,7 @@ export const onunmount = (node: Node, fn: Function) => {
   subs.add(fn)
 }
 
-export const offunmount = (node: Node, fn: Function) => {
+export const offunmount = (node: Node, fn: Function): void => {
   const subs = unmount_set.get(node)
   if (subs) {
     subs.delete(fn)
@@ -132,13 +132,17 @@ const check_node = (node: Node, map: WeakMap<Node, Set<Function>>) => {
     check_node(child, map)
 }
 
-export const init_mount_observer = () => {
-  new MutationObserver(list => {
+let observer: MutationObserver
+
+export const init_mount_observer = (): void => {
+  if (observer) return
+  observer = new MutationObserver(list => {
     for (const mut of list) {
       for (const node of mut.addedNodes)   check_node(node, mount_set)
       for (const node of mut.removedNodes) check_node(node, unmount_set)
     }
-  }).observe(document.body, {
+  })
+  observer.observe(document.body, {
     childList: true,
     subtree:   true,
   })

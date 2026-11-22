@@ -40,8 +40,8 @@ export const ui_pool_get = <T extends HTMLTag>(pool: UI_Pool<T>): Element<T> => 
 }
 
 
-export const ui_pool_put = <T extends HTMLTag>(pool: UI_Pool<T>, el: Element<T>): void => {
-  pool.list.push(el)
+export const ui_pool_put = <T extends HTMLTag>(pool: UI_Pool<T>, ...el: Element<T>[]): void => {
+  pool.list.push(...el)
 }
 
 
